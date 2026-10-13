@@ -1,1 +1,1 @@
-{"name":"porur-native","private":true,"workspaces":["apps/*","packages/*"]}
+{"name":"porur-native","private":true,"workspaces":["apps/*","packages/*"],"devDependencies":{"@google-cloud/firestore":"^9.3.1","firebase-admin":"^14.5.0"}}

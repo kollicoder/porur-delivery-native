@@ -6,9 +6,9 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { cartTotals, buildOrders, rs } from '@porur/shared';
 import { s, C } from '../src/theme';
 import { Btn } from '../src/ui';
-import { useApp, api, ME } from '../src/store';
+import { useApp, api } from '../src/store';
 export default function Checkout() {
-  const { cart, clear, products, settings, uid } = useApp(); const { lines, total, needsRx } = cartTotals(cart, products, settings);
+  const { cart, clear, products, settings, uid, who, pushToken } = useApp(); const { lines, total, needsRx } = cartTotals(cart, products, settings);
   const [addr, setAddr] = useState('Flat 2A, Sri Sai Apartments, Mount-Poonamallee Rd, Porur'); const [pay, setPay] = useState<'UPI' | 'COD'>('UPI');
   const [rx, setRx] = useState<string>(); const [busy, setBusy] = useState(false);
   const hasMed = lines.some(l => products.find(p => p.id === l.productId)?.cat === 'med');
@@ -21,7 +21,7 @@ export default function Checkout() {
   };
   const place = async () => {
     setBusy(true); await new Promise(r => setTimeout(r, pay === 'UPI' ? 900 : 200)); // mock UPI
-    const orders = buildOrders(cart, { ...ME, customerUid: uid, address: addr, pay, prescriptionUri: rx }, products, settings);
+    const orders = buildOrders(cart, { ...who, customerUid: uid, address: addr, pay, prescriptionUri: rx, dropLat: 13.0502, dropLng: 80.1655, customerPushToken: pushToken }, products, settings);
     await api.createOrders(orders); clear(); router.replace(`/order/${orders[0].id}`);
   };
   if (!lines.length) return <View style={s.page}><Text style={[s.muted, { padding: 20 }]}>Cart is empty.</Text></View>;

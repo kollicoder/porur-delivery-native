@@ -14,6 +14,7 @@ export interface Order {
   lines: OrderLine[]; subtotal: number; fee: number; total: number; pay: 'UPI' | 'COD';
   status: OrderStatus; createdAt: string; otp: string; rider?: string; customerUid?: string; updatedAt?: string;
   prescriptionUri?: string; rxStatus?: 'pending' | 'approved' | 'rejected'; note?: string;
+  dropLat?: number; dropLng?: number; customerPushToken?: string;
 }
 export type Cart = Record<string, number>;
 
@@ -28,7 +29,7 @@ const rid = (p: string) => p + Math.floor(1000 + Math.random() * 9000);
 const otp = () => String(1000 + Math.floor(Math.random() * 9000));
 
 /** Splits a cart into one order per store (each vendor sees only its part). */
-export function buildOrders(cart: Cart, info: { customer: string; phone: string; address: string; pay: 'UPI'|'COD'; prescriptionUri?: string; customerUid?: string },
+export function buildOrders(cart: Cart, info: { customer: string; phone: string; address: string; pay: 'UPI'|'COD'; prescriptionUri?: string; customerUid?: string; dropLat?: number; dropLng?: number; customerPushToken?: string },
   products: LiveProduct[] = PRODUCTS, st: Settings = DEFAULT_SETTINGS): Order[] {
   const byStore: Record<string, OrderLine[]> = {};
   cartLines(cart, products).forEach(l => { const s = products.find(p => p.id === l.productId)!.store; (byStore[s] ||= []).push(l); });
@@ -40,16 +41,17 @@ export function buildOrders(cart: Cart, info: { customer: string; phone: string;
       ...(hasRx ? { prescriptionUri: info.prescriptionUri ?? null, rxStatus: 'pending' } : {}) } as Order;
   });
 }
-export function buildErrand(i: { pickup: string; drop: string; task: string; price: number; customer: string; phone: string; customerUid?: string }): Order {
-  return { id: rid('ER'), type: 'errand', customer: i.customer, phone: i.phone, ...(i.customerUid ? { customerUid: i.customerUid } : {}), address: i.drop, note: `${i.task} (pickup: ${i.pickup})`,
+export function buildErrand(i: { pickup: string; drop: string; task: string; price: number; customer: string; phone: string; customerUid?: string; dropLat?: number; dropLng?: number; customerPushToken?: string }): Order {
+  return { id: rid('ER'), type: 'errand', customer: i.customer, phone: i.phone, ...(i.customerUid ? { customerUid: i.customerUid } : {}), address: i.drop, note: `${i.task} (pickup: ${i.pickup})`, dropLat: i.dropLat, dropLng: i.dropLng, customerPushToken: i.customerPushToken,
     lines: [], subtotal: i.price, fee: 0, total: i.price, pay: 'UPI', status: 'placed', createdAt: new Date().toISOString(), otp: otp() };
 }
 
+const DROP = (i: number) => ({ dropLat: 13.0382 + Math.sin(i) * 0.02, dropLng: 80.1565 + Math.cos(i) * 0.02 });
 const mk = (id: string, storeId: string, customer: string, address: string, items: [string, number][], status: OrderStatus, pay: 'UPI'|'COD', minsAgo: number, rx?: boolean): Order => {
   const lines = items.map(([pid, qty]) => { const p = PRODUCTS.find(x => x.id === pid)!; return { productId: pid, name: p.name, qty, price: p.price, rx: p.rx }; });
   const subtotal = lines.reduce((a, l) => a + l.price * l.qty, 0); const fee = deliveryFee(subtotal);
   return { id, type:'order', storeId, customer, phone:'98400 1' + id.slice(-4), address, lines, subtotal, fee, total: subtotal + fee, pay, status,
-    createdAt: new Date(Date.now() - minsAgo * 60000).toISOString(), otp: '4821', rider: 'r1', ...(rx ? { prescriptionUri: 'sample', rxStatus: 'pending' as const } : {}) };
+    createdAt: new Date(Date.now() - minsAgo * 60000).toISOString(), otp: '4821', rider: 'r1', ...DROP(+id.slice(-2)), ...(rx ? { prescriptionUri: 'sample', rxStatus: 'pending' as const } : {}) };
 };
 export const SEED_ORDERS: Order[] = [
   mk('PD1042','s1','Lakshmi R','Ramaniyam Apts, Porur',[['p1',2],['p2',1],['p6',2]],'placed','UPI',3),

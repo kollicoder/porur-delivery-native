@@ -10,11 +10,14 @@ import { PRODUCTS, RIDERS, Rider } from './catalogue';
 import { Settings, DEFAULT_SETTINGS } from './pricing';
 
 export type Role = 'customer' | 'vendor' | 'rider' | 'admin';
+export interface AccessRequest { role: 'vendor' | 'rider'; storeId?: string; riderId?: string; note?: string; at: string }
+/** users/{uid}. `role` is set ONLY by an admin (rules enforce); no role = customer. */
+export interface UserProfile { uid: string; phone: string; name?: string; role?: Role; storeId?: string; riderId?: string; request?: AccessRequest; pushToken?: string; createdAt?: string }
 export interface ProductOverride { price?: number; inStock?: boolean }
 export interface OrderFilter { storeId?: string; customerUid?: string; rider?: string }
 export type Unsub = () => void;
 export interface PorurApi {
-  init(role: Role): Promise<string>;              // signs in, returns uid
+  init(role?: Role): Promise<string>;             // resolves once signed in
   uid(): string | undefined;
   watchOrders(f: OrderFilter, cb: (o: Order[]) => void): Unsub;
   watchProducts(cb: (p: LiveProduct[]) => void): Unsub;

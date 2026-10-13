@@ -9,3 +9,5 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 .fbproject
+*.local
+firebase/firestore.rules
