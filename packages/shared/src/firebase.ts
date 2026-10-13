@@ -13,12 +13,14 @@ const clean = <T extends object>(o: T): T => JSON.parse(JSON.stringify(o));
 
 export class FirestoreApi implements PorurApi {
   db: Firestore; auth: Auth; private _uid?: string;
+  private ready!: Promise<string>; private resolveReady!: (u: string) => void;
   constructor() {
     const app = getApps()[0] || initializeApp(backendConfig.firebase);
     this.auth = getAuth(app);
     // long-polling autodetect makes Firestore work inside React Native
     this.db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
     const h = backendConfig.emulatorHost;
+    this.ready = new Promise(r => (this.resolveReady = r));
     if (h) { connectAuthEmulator(this.auth, `http://${h}:9099`, { disableWarnings: true }); connectFirestoreEmulator(this.db, h, 8080); }
   }
   async init(role: Role) {
@@ -26,6 +28,7 @@ export class FirestoreApi implements PorurApi {
     this._uid = cred.user.uid;
     // Demo role picker: the user's role lives in users/{uid}. Phone-OTP auth + admin-assigned roles come later.
     await setDoc(doc(this.db, 'users', this._uid), { role, updatedAt: new Date().toISOString() }, { merge: true });
+    this.resolveReady(this._uid); // writes below wait until sign-in + role are in place
     return this._uid;
   }
   uid() { return this._uid; }
@@ -46,6 +49,7 @@ export class FirestoreApi implements PorurApi {
     return onSnapshot(collection(this.db, 'riders'), s => cb(s.docs.map(d => d.data() as Rider).sort((a, b) => +a.id.slice(1) - +b.id.slice(1))), e => console.warn('riders', e));
   }
   async createOrders(orders: Order[]) {
+    await this.ready;
     const b = writeBatch(this.db); const now = new Date().toISOString();
     for (const o of orders) {
       // orders = one doc per store; errands go to the same collection with type 'errand' (+ mirrored in /errands for reporting)
@@ -55,10 +59,10 @@ export class FirestoreApi implements PorurApi {
     }
     await b.commit();
   }
-  updateOrder(id: string, patch: Partial<Order>) { return updateDoc(doc(this.db, 'orders', id), clean({ ...patch, updatedAt: new Date().toISOString() })); }
+  async updateOrder(id: string, patch: Partial<Order>) { await this.ready; return updateDoc(doc(this.db, 'orders', id), clean({ ...patch, updatedAt: new Date().toISOString() })); }
   setStatus(id: string, status: OrderStatus) { return this.updateOrder(id, { status }); }
-  updateProduct(id: string, patch: ProductOverride) { return updateDoc(doc(this.db, 'products', id), clean(patch)); }
-  updateSettings(patch: Partial<Settings>) { return setDoc(doc(this.db, 'settings', 'app'), clean(patch), { merge: true }); }
-  updateRider(id: string, patch: Partial<Rider>) { return updateDoc(doc(this.db, 'riders', id), clean(patch)); }
+  async updateProduct(id: string, patch: ProductOverride) { await this.ready; return updateDoc(doc(this.db, 'products', id), clean(patch)); }
+  async updateSettings(patch: Partial<Settings>) { await this.ready; return setDoc(doc(this.db, 'settings', 'app'), clean(patch), { merge: true }); }
+  async updateRider(id: string, patch: Partial<Rider>) { await this.ready; return updateDoc(doc(this.db, 'riders', id), clean(patch)); }
   async isSeeded() { return (await getDoc(doc(this.db, 'settings', 'app'))).exists(); }
 }
