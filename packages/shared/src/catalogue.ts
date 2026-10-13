@@ -1,5 +1,5 @@
 export type Category = 'grocery' | 'fv' | 'med';
-export interface Store { id: string; name: string; cat: Category; type: string; eta: string; rating: number; open: string; commission: number; }
+export interface Store { id: string; name: string; cat: Category; type: string; eta: string; rating: number; open: string; commission: number; lat: number; lng: number; }
 export interface Product { id: string; store: string; cat: Category; name: string; ta: string; unit: string; price: number; emoji: string; kw: string[]; rx?: boolean; }
 
 export const CATEGORIES = [
@@ -10,9 +10,9 @@ export const CATEGORIES = [
 ] as const;
 
 export const STORES: Store[] = [
-  { id: 's1', name: 'Porur Fresh Fruits & Veg', cat: 'fv', type: 'Fruits & Veg vendor', eta: '20-30 min', rating: 4.5, open: '5 AM – 11 PM', commission: 12 },
-  { id: 's2', name: 'Sri Murugan Supermarket', cat: 'grocery', type: 'Supermarket', eta: '25-35 min', rating: 4.3, open: '24 x 7 (via hub)', commission: 10 },
-  { id: 's3', name: 'Porur Pharmacy (tie-up)', cat: 'med', type: 'Licensed pharmacy', eta: '20-30 min', rating: 4.7, open: '24 x 7', commission: 8 },
+  { id: 's1', name: 'Porur Fresh Fruits & Veg', cat: 'fv', type: 'Fruits & Veg vendor', eta: '20-30 min', rating: 4.5, open: '5 AM – 11 PM', commission: 12, lat: 13.0359, lng: 80.1574 },
+  { id: 's2', name: 'Sri Murugan Supermarket', cat: 'grocery', type: 'Supermarket', eta: '25-35 min', rating: 4.3, open: '24 x 7 (via hub)', commission: 10, lat: 13.0382, lng: 80.1617 },
+  { id: 's3', name: 'Porur Pharmacy (tie-up)', cat: 'med', type: 'Licensed pharmacy', eta: '20-30 min', rating: 4.7, open: '24 x 7', commission: 8, lat: 13.0331, lng: 80.1532 },
 ];
 
 export const PRODUCTS: Product[] = [
@@ -37,7 +37,10 @@ export const PRODUCTS: Product[] = [
 ];
 export const productById = (id: string) => PRODUCTS.find(p => p.id === id);
 
-export interface Rider { id: string; name: string; status: 'online' | 'delivering' | 'break' | 'offline'; phone: string; today: number }
+export interface Rider { id: string; name: string; status: 'online' | 'delivering' | 'break' | 'offline'; phone: string; today: number; lat?: number; lng?: number; locAt?: string }
+/** Porur hub (centre of the 3–5 km zone) */
+export const HUB = { lat: 13.0382, lng: 80.1565 };
 export const RIDERS: Rider[] = ([['Karthik','online'],['Suresh','delivering'],['Prakash','online'],['Murali','delivering'],['Arun','offline'],
   ['Vijay','online'],['Senthil','delivering'],['Ramesh','break'],['Dinesh','online'],['Bala','offline']] as const)
-  .map(([name, status], i) => ({ id: 'r' + (i + 1), name, status, phone: '98400 1' + (1000 + i * 37), today: [6,9,4,11,0,7,8,5,3,0][i] }));
+  .map(([name, status], i) => ({ id: 'r' + (i + 1), name, status, phone: '98400 1' + (1000 + i * 37), today: [6,9,4,11,0,7,8,5,3,0][i],
+    lat: 13.0382 + Math.sin(i * 1.7) * 0.018, lng: 80.1565 + Math.cos(i * 1.7) * 0.018 }));

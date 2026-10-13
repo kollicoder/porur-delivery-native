@@ -1,17 +1,25 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getApi, SEED_ORDERS, Order, STORES, Store, LiveProduct, PRODUCTS } from '@porur/shared';
-export const api = getApi(SEED_ORDERS);
-type Ctx = { store?: Store; setStoreId: (id?: string) => void; orders: Order[]; refresh: () => Promise<void>; products: LiveProduct[]; ready: boolean };
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import type { User } from 'firebase/auth';
+import { getApi, SEED_ORDERS, Order, STORES, Store, LiveProduct, PRODUCTS, UserProfile } from '@porur/shared';
+import type { FirestoreApi } from '@porur/shared/src/firebase';
+import { setupNotifications, localNotify } from '@porur/shared/src/ui/notify';
+export const api = getApi(SEED_ORDERS) as FirestoreApi;
+type Ctx = { store?: Store; setStoreId: (id?: string) => void; orders: Order[]; refresh: () => Promise<void>; products: LiveProduct[]; ready: boolean;
+  user?: User | null; me?: UserProfile | null };
 const Ctx = createContext<Ctx>(null as any); export const useVendor = () => useContext(Ctx);
 export function VendorProvider({ children }: { children: React.ReactNode }) {
-  const [storeId, setSid] = useState<string>(); const [orders, setOrders] = useState<Order[]>([]); const [products, setProducts] = useState<LiveProduct[]>(PRODUCTS);
-  const [ready, setReady] = useState(false); const [authed, setAuthed] = useState(false);
-  useEffect(() => { AsyncStorage.getItem('porur.vendor.store').then(v => { if (v) setSid(v); setReady(true); }); }, []);
-  useEffect(() => { api.init('vendor').then(() => setAuthed(true)).catch(e => console.warn('auth', e)); }, []);
-  useEffect(() => { if (!authed) return; return api.watchProducts(p => p.length && setProducts(p)); }, [authed]);
-  useEffect(() => { if (!authed || !storeId) return; return api.watchOrders({ storeId }, setOrders); }, [authed, storeId]);
-  const setStoreId = (id?: string) => { setSid(id); id ? AsyncStorage.setItem('porur.vendor.store', id) : AsyncStorage.removeItem('porur.vendor.store'); };
-  return <Ctx.Provider value={{ store: STORES.find(s => s.id === storeId), setStoreId, orders, refresh: async () => {}, products, ready }}>{children}</Ctx.Provider>;
+  const [orders, setOrders] = useState<Order[]>([]); const [products, setProducts] = useState<LiveProduct[]>(PRODUCTS);
+  const [user, setUser] = useState<User | null | undefined>(undefined); const [me, setMe] = useState<UserProfile | null | undefined>(undefined);
+  useEffect(() => api.onAuth(u => { setUser(u); if (!u) setMe(null); }), []);
+  useEffect(() => { if (!user) return; setupNotifications().catch(() => {}); return api.watchMe(setMe); }, [user]);
+  // Role comes only from users/{uid} written by the admin (rules block self-assignment)
+  const storeId = me?.role === 'vendor' || me?.role === 'admin' ? me?.storeId : undefined;
+  useEffect(() => { if (!storeId) return; return api.watchProducts(p => p.length && setProducts(p)); }, [storeId]);
+  useEffect(() => { if (!storeId) return; return api.watchOrders({ storeId }, setOrders); }, [storeId]);
+  const seen = useRef<Set<string> | null>(null);
+  useEffect(() => { const prev = seen.current; seen.current = new Set(orders.map(o => o.id));
+    if (prev) orders.forEach(o => { if (!prev.has(o.id) && o.status === 'placed') localNotify('🛎️ New order ' + o.id, `${o.customer} · ₹${o.total}`); }); }, [orders.map(o => o.id).join()]);
+  const ready = user !== undefined && (user === null || me !== undefined);
+  return <Ctx.Provider value={{ store: STORES.find(s => s.id === storeId), setStoreId: () => { api.logout(); }, orders, refresh: async () => {}, products, ready, user, me }}>{children}</Ctx.Provider>;
 }
 export const useProducts = () => { const { store, products } = useVendor(); return products.filter(p => p.store === store?.id); };

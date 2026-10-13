@@ -1,3 +1,4 @@
+import { sendPush, STATUS_TEXT } from '@porur/shared/src/ui/notify';
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
@@ -9,7 +10,7 @@ const mins = (iso: string) => Math.max(0, Math.round((Date.now() - +new Date(iso
 export default function Orders() {
   const { orders, refresh, store } = useVendor(); const [tab, setTab] = useState<'active' | 'done'>('active');
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
-  const set = async (o: Order, st: OrderStatus) => { await api.setStatus(o.id, st); refresh(); };
+  const set = async (o: Order, st: OrderStatus) => { await api.setStatus(o.id, st); if (o.customerPushToken) sendPush(o.customerPushToken, `Order ${o.id}`, STATUS_TEXT[st] || st).catch(() => {}); refresh(); };
   const simulate = async () => {
     const ps = PRODUCTS.filter(p => p.store === store!.id && !p.rx).slice(0, 3); const lines = ps.map(p => ({ productId: p.id, name: p.name, qty: 2, price: p.price }));
     const subtotal = lines.reduce((a, l) => a + l.price * l.qty, 0);

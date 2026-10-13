@@ -4,18 +4,18 @@ import { router } from 'expo-router';
 import { errandPrice, buildErrand, rs } from '@porur/shared';
 import { s, C } from '../src/theme';
 import { Btn } from '../src/ui';
-import { api, ME, useApp } from '../src/store';
+import { api, useApp } from '../src/store';
 const Step = ({ v, set, min, max, unit }: { v: number; set: (n: number) => void; min: number; max: number; unit: string }) =>
   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
     <Pressable style={s.chip} onPress={() => set(Math.max(min, v - 0.5 * (unit === 'km' ? 1 : 2)))}><Text style={{ fontSize: 18 }}>−</Text></Pressable>
     <Text style={{ fontWeight: '800', fontSize: 18 }}>{v} {unit}</Text>
     <Pressable style={s.chip} onPress={() => set(Math.min(max, v + 0.5 * (unit === 'km' ? 1 : 2)))}><Text style={{ fontSize: 18 }}>+</Text></Pressable></View>;
 export default function Rider() {
-  const { settings, uid } = useApp();
+  const { settings, uid, who, pushToken } = useApp();
   const [mode, setMode] = useState<'trip' | 'hour'>('trip'); const [pickup, setPickup] = useState('Saravana Stores, Porur Junction');
   const [drop, setDrop] = useState('Flat 2A, Sri Sai Apartments, Porur'); const [task, setTask] = useState('Pick up a parcel and hand it over at home');
   const [km, setKm] = useState(3); const [hours, setHours] = useState(1); const price = errandPrice(mode, km, hours, settings);
-  const book = async () => { const e = buildErrand({ pickup, drop, task, price, ...ME, customerUid: uid }); await api.createOrders([e]); router.replace(`/order/${e.id}`); };
+  const book = async () => { const e = buildErrand({ pickup, drop, task, price, ...who, customerUid: uid, dropLat: 13.0482, dropLng: 80.1685, customerPushToken: pushToken }); await api.createOrders([e]); router.replace(`/order/${e.id}`); };
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>
     <Text style={s.muted}>Anything, anywhere in Porur — pick up, drop, buy & bring, stand in a queue.</Text>
     <View style={{ flexDirection: 'row', backgroundColor: '#e5e7eb', borderRadius: 12, padding: 4, marginTop: 10 }}>

@@ -1,0 +1,61 @@
+rules_version = '2';
+// Porur Delivery — Firestore rules (v0.3: phone auth + admin-assigned roles).
+// __ADMIN_PHONES__ is replaced at deploy time from firebase/.admin-bootstrap.local (never committed).
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // Phone-verified users only (anonymous sessions have no phone_number).
+    function signedIn() { return request.auth != null && request.auth.token.get('phone_number', '') != ''; }
+    function me() { return get(/databases/$(db)/documents/users/$(request.auth.uid)).data; }
+    function hasProfile() { return exists(/databases/$(db)/documents/users/$(request.auth.uid)); }
+    // Bootstrap admin: phone number verified by Firebase Phone Auth (unforgeable), no custom claims needed.
+    function bootstrapAdmin() { return signedIn() && request.auth.token.phone_number in [__ADMIN_PHONES__]; }
+    function isAdmin() { return bootstrapAdmin() || (signedIn() && hasProfile() && me().get('role', '') == 'admin'); }
+    function isVendorOf(storeId) { return signedIn() && hasProfile() && me().get('role', '') == 'vendor' && me().get('storeId', '') == storeId; }
+    function isRiderId(riderId) { return signedIn() && hasProfile() && me().get('role', '') == 'rider' && me().get('riderId', '') == riderId; }
+    function changes() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function onlyChanges(keys) { return changes().hasOnly(keys); }
+
+    match /users/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      // Users create/edit their own profile and may file an access *request*, but can never grant themselves a role.
+      allow create: if (signedIn() && request.auth.uid == uid
+                        && !request.resource.data.keys().hasAny(['role', 'storeId', 'riderId'])
+                        && request.resource.data.get('phone', '') == request.auth.token.phone_number)
+                    || isAdmin();
+      allow update: if (signedIn() && request.auth.uid == uid && !changes().hasAny(['role', 'storeId', 'riderId', 'phone'])) || isAdmin();
+      allow delete: if isAdmin();
+    }
+    match /settings/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /stores/{id}   { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /products/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isVendorOf(resource.data.store) && onlyChanges(['price', 'inStock']));
+    }
+    match /riders/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isRiderId(id) && onlyChanges(['status', 'today', 'lat', 'lng', 'locAt']));
+    }
+    match /orders/{id} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.customerUid == request.auth.uid)
+        || isVendorOf(resource.data.get('storeId', ''))
+        || isRiderId(resource.data.get('rider', ''));
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid && request.resource.data.status == 'placed';
+      allow update: if isAdmin()
+        || (isVendorOf(resource.data.get('storeId', '')) && onlyChanges(['status', 'rxStatus', 'updatedAt'])
+            && request.resource.data.status in ['placed', 'accepted', 'rejected', 'ready'])
+        || (isRiderId(resource.data.get('rider', '')) && onlyChanges(['status', 'updatedAt'])
+            && request.resource.data.status in ['accepted', 'picked_up', 'on_the_way', 'delivered'])
+        || (signedIn() && resource.data.customerUid == request.auth.uid && onlyChanges(['status', 'updatedAt'])
+            && resource.data.status == 'placed' && request.resource.data.status == 'rejected');
+      allow delete: if isAdmin();
+    }
+    match /errands/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+  }
+}

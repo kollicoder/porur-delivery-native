@@ -1,24 +1,23 @@
 import React from 'react';
 import { ScrollView, View, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { CUSTOMER_STEPS, rs, STORES, RIDERS, backendConfig } from '@porur/shared';
+import { CUSTOMER_STEPS, rs, STORES, backendConfig, HUB } from '@porur/shared';
+import { MapView } from '@porur/shared/src/ui/MapView';
 import { s, C } from '../../src/theme';
 import { Btn } from '../../src/ui';
 import { api, useApp } from '../../src/store';
 export default function Track() {
-  const { id } = useLocalSearchParams<{ id: string }>(); const { orders } = useApp(); const o = orders.find(x => x.id === id);
+  const { id } = useLocalSearchParams<{ id: string }>(); const { orders, riders } = useApp(); const o = orders.find(x => x.id === id);
   if (!o) return <View style={s.page}><Text style={[s.muted, { padding: 20 }]}>Loading order…</Text></View>;
-  const rider = RIDERS.find(r => r.id === o.rider);
+  const rider = riders.find(r => r.id === o.rider); const store = STORES.find(x => x.id === o.storeId);
   const idx = Math.max(0, CUSTOMER_STEPS.findIndex(x => x.key === o.status));
   const next = CUSTOMER_STEPS[idx + 1];
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>
-    <View style={{ height: 180, borderRadius: 16, backgroundColor: '#e7f0e3', overflow: 'hidden' }}>
-      <View style={{ position: 'absolute', left: 0, right: 0, top: '55%', height: 14, backgroundColor: '#d4d4d8' }} />
-      <View style={{ position: 'absolute', top: 0, bottom: 0, left: '48%', width: 14, backgroundColor: '#d4d4d8' }} />
-      <Text style={{ position: 'absolute', left: '8%', top: '66%', fontSize: 26 }}>🏪</Text><Text style={{ position: 'absolute', right: '10%', top: '10%', fontSize: 26 }}>🏠</Text>
-      <Text style={{ position: 'absolute', left: `${12 + idx * 14}%`, top: `${68 - idx * 11}%`, fontSize: 26 }}>🛵</Text>
-      <Text style={{ position: 'absolute', bottom: 6, right: 10, color: C.muted, fontSize: 11 }}>Map placeholder · Porur (react-native-maps later)</Text>
-    </View>
+    <MapView testID="track-map" height={220} pins={[
+      ...(store ? [{ lat: store.lat, lng: store.lng, emoji: '🏪', label: store.name.split(' ')[0] }] : []),
+      { lat: o.dropLat ?? HUB.lat + 0.01, lng: o.dropLng ?? HUB.lng + 0.01, emoji: '🏠', label: 'You' },
+      ...(rider?.lat && idx >= 1 && o.status !== 'delivered' ? [{ lat: rider.lat, lng: rider.lng!, emoji: '🛵', label: rider.name }] : []),
+    ]} />
     <View style={s.card} testID="track-card">
       <Text style={{ fontSize: 18, fontWeight: '800', color: '#15803d', marginBottom: 8 }}>{o.status === 'delivered' ? 'Delivered 🎉' : `Arriving in ~${Math.max(5, 30 - idx * 5)} min`}</Text>
       {CUSTOMER_STEPS.map((st, i) => <View key={st.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 }}>
