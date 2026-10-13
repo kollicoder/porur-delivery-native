@@ -23,7 +23,7 @@ export interface PorurApi {
   watchProducts(cb: (p: LiveProduct[]) => void): Unsub;
   watchSettings(cb: (s: Settings) => void): Unsub;
   watchRiders(cb: (r: Rider[]) => void): Unsub;
-  createOrders(orders: Order[]): Promise<void>;
+  createOrders(orders: Order[], opts?: any): Promise<unknown>;
   updateOrder(id: string, patch: Partial<Order>): Promise<void>;
   setStatus(id: string, status: OrderStatus): Promise<void>;
   updateProduct(id: string, patch: ProductOverride): Promise<void>;

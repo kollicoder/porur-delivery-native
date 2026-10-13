@@ -24,7 +24,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
     const subs = [api.watchProducts(p => p.length && setProducts(p)), api.watchSettings(setSettings), api.watchRiders(r => r.length && setRiders(r)),
       api.watchOrders({ customerUid: 'me' }, setOrders), api.watchMe(setMe)];
-    setupNotifications().then(r => { if (r.pushToken) { setPushToken(r.pushToken); api.updateMe({ pushToken: r.pushToken }).catch(() => {}); } }).catch(() => {});
+    setupNotifications().then(r => { if (r.pushToken) { setPushToken(r.pushToken); api.updateMe({ pushToken: r.pushToken }).catch(() => {}); api.registerPushToken(r.pushToken).catch(() => {}); } }).catch(() => {});
     return () => subs.forEach(f => f());
   }, [user]);
   // Local notification when one of my orders changes status
