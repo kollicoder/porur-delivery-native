@@ -12,7 +12,7 @@ if (!live) process.env.FIRESTORE_EMULATOR_HOST ||= 'localhost:8080';
 const projectId = live ? process.env.GOOGLE_CLOUD_PROJECT! : 'demo-porur';
 (async () => {
   initializeApp({ projectId }); const db = getFirestore(); const b = db.batch();
-  if (process.argv.includes('--clear-orders')) for (const c of ['orders', 'errands']) (await db.collection(c).get()).docs.forEach(d => b.delete(d.ref));
+  if (process.argv.includes('--clear-orders')) for (const c of ['orders', 'errands', 'orderSecrets', 'prescriptions', 'pushTokens']) (await db.collection(c).get()).docs.forEach(d => b.delete(d.ref));
   STORES.forEach(s => b.set(db.doc('stores/' + s.id), s));
   PRODUCTS.forEach(p => b.set(db.doc('products/' + p.id), { ...p, rx: !!p.rx, inStock: true }));
   RIDERS.forEach(r => b.set(db.doc('riders/' + r.id), r));
