@@ -32,21 +32,35 @@ export class FirestoreApi implements PorurApi {
     return this._uid;
   }
   uid() { return this._uid; }
+  /** Rules require sign-in, so listeners attach only after init() has finished. */
+  private defer(start: () => Unsub): Unsub {
+    let unsub: Unsub | undefined, cancelled = false;
+    this.ready.then(() => { if (!cancelled) unsub = start(); });
+    return () => { cancelled = true; unsub?.(); };
+  }
   watchOrders(f: OrderFilter, cb: (o: Order[]) => void): Unsub {
+    return this.defer(() => {
     const c: any[] = [];
     if (f.storeId) c.push(where('storeId', '==', f.storeId));
     if (f.customerUid) c.push(where('customerUid', '==', f.customerUid));
     if (f.rider) c.push(where('rider', '==', f.rider));
     return onSnapshot(query(collection(this.db, 'orders'), ...c), s => cb(sortOrders(s.docs.map(d => d.data() as Order))), e => console.warn('orders', e));
+    });
   }
   watchProducts(cb: (p: LiveProduct[]) => void): Unsub {
+    return this.defer(() => {
     return onSnapshot(collection(this.db, 'products'), s => cb(s.docs.map(d => d.data() as LiveProduct).sort((a, b) => +a.id.slice(1) - +b.id.slice(1))), e => console.warn('products', e));
+    });
   }
   watchSettings(cb: (s: Settings) => void): Unsub {
+    return this.defer(() => {
     return onSnapshot(doc(this.db, 'settings', 'app'), s => cb({ ...DEFAULT_SETTINGS, ...(s.data() as Partial<Settings>) }), e => console.warn('settings', e));
+    });
   }
   watchRiders(cb: (r: Rider[]) => void): Unsub {
+    return this.defer(() => {
     return onSnapshot(collection(this.db, 'riders'), s => cb(s.docs.map(d => d.data() as Rider).sort((a, b) => +a.id.slice(1) - +b.id.slice(1))), e => console.warn('riders', e));
+    });
   }
   async createOrders(orders: Order[]) {
     await this.ready;
