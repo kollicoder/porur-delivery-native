@@ -1,0 +1,21 @@
+const { chromium } = require('/workspace/porur-prototype/node_modules/playwright');
+(async () => {
+  const b = await chromium.launch(); const p = await b.newPage({ viewport:{width:390,height:844}, deviceScaleFactor:2 });
+  const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+  const C='http://localhost:8081', V='http://localhost:8082', w=ms=>p.waitForTimeout(ms), sh=n=>p.screenshot({path:`screenshots/${n}.png`});
+  const go = async u => { await p.goto(u); await w(2500); };
+  await go(C+'/'); await sh('customer-01-home');
+  await go(C+'/voice'); await p.getByText('2 kg tomato, 1 litre milk, 1 dozen eggs').click(); await w(500); await sh('customer-02-voice');
+  await p.getByTestId('add-parsed').click(); await w(800);
+  await go(C+'/category/med'); await p.getByTestId('add-p16').click(); await p.getByTestId('add-p14').click(); await w(400); await sh('customer-03-medicines');
+  await go(C+'/cart'); await sh('customer-04-cart');
+  await go(C+'/checkout'); await sh('customer-05-checkout-rx');
+  await go(C+'/rider'); await sh('customer-06-book-rider');
+  await p.getByTestId('book').click(); await w(1500); await sh('customer-07-tracking');
+  await go(V+'/'); await sh('vendor-01-login');
+  await p.getByTestId('store-s3').click(); await p.getByTestId('login').click(); await w(2000); await sh('vendor-02-orders-pharmacy');
+  await go(V+'/rx'); await sh('vendor-03-rx-review');
+  await go(V+'/catalogue'); await sh('vendor-04-catalogue');
+  await go(V+'/sales'); await sh('vendor-05-sales');
+  console.log('errors', errs); await b.close();
+})();

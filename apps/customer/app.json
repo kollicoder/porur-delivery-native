@@ -1,0 +1,66 @@
+{
+  "expo": {
+    "name": "Porur Delivery",
+    "slug": "porur-delivery",
+    "scheme": "porurdelivery",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#16a34a"
+    },
+    "ios": {
+      "bundleIdentifier": "com.porurdelivery.customer",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Speak your shopping list",
+        "NSSpeechRecognitionUsageDescription": "Understand your spoken order",
+        "NSPhotoLibraryUsageDescription": "Upload your prescription",
+        "NSCameraUsageDescription": "Photograph your prescription"
+      }
+    },
+    "android": {
+      "package": "com.porurdelivery.customer",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#16a34a"
+      },
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-splash-screen",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Upload your prescription",
+          "cameraPermission": "Photograph your prescription"
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Speak your shopping list",
+          "speechRecognitionPermission": "Understand your spoken order",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
