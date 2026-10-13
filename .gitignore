@@ -11,3 +11,4 @@ ui-debug.log
 .fbproject
 *.local
 firebase/firestore.rules
+.firestore.rules.tmp

@@ -49,7 +49,7 @@ export class FirestoreApi implements PorurApi {
   /** Calls cb with the signed-in user (or null). Resolves listeners/writes once a phone user + profile exist. */
   onAuth(cb: (u: User | null) => void): Unsub {
     return onAuthStateChanged(this.auth, async u => {
-      if (u && u.phoneNumber) { this._uid = u.uid; await this.ensureProfile(u); this.resolveReady(u.uid); }
+      if (u && u.phoneNumber) { this._uid = u.uid; try { await this.ensureProfile(u); } catch (e: any) { console.warn('profile', e?.code, e?.message); } this.resolveReady(u.uid); }
       else { this._uid = undefined; }
       cb(u && u.phoneNumber ? u : null);
     });
