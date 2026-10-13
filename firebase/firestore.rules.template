@@ -73,18 +73,18 @@ service cloud.firestore {
     // Delivery OTP: only the customer (and admin). Riders/vendors can never read it.
     match /orderSecrets/{id} {
       allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
-      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid
+      allow create: if isAdmin() || (signedIn() && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.otp is string && request.resource.data.otp.matches('^[0-9]{4}$')
         && getAfter(/databases/$(db)/documents/orders/$(id)).data.customerUid == request.auth.uid
-        && !exists(/databases/$(db)/documents/orders/$(id));
+        && !exists(/databases/$(db)/documents/orders/$(id)));
       allow update, delete: if isAdmin();
     }
     // Prescription photo (Spark plan has no Storage bucket): own doc, size-capped (~300 KB base64), never readable by riders.
     match /prescriptions/{id} {
       allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid) || isVendorOf(resource.data.get('storeId', ''));
-      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid
+      allow create: if isAdmin() || (signedIn() && request.resource.data.customerUid == request.auth.uid
         && request.resource.data.img is string && request.resource.data.img.size() < 300000
-        && getAfter(/databases/$(db)/documents/orders/$(id)).data.customerUid == request.auth.uid;
+        && getAfter(/databases/$(db)/documents/orders/$(id)).data.customerUid == request.auth.uid);
       allow update, delete: if isAdmin();
     }
     // Expo push tokens. Any signed-in user can look up a store's / rider's devices to notify them (no server on Spark).

@@ -27,6 +27,9 @@ async function codeFor(phone) {
   ok('vendor (s1) signs in to orders', /orders/.test(vend.url()));
   await rider.goto(P + Q + '#/rider/home'); await login(rider, PH.rider);
   ok('rider view loads', await rider.getByTestId('gps-share').isVisible({ timeout: 15000 }).catch(() => false));
+  if (LIVE) { // live: give our test rider (Karthik) a fresh GPS fix at the hub so nearest-rider dispatch is deterministic
+    if (/Offline/.test(await rider.textContent('.rhead'))) { await rider.locator('.rhead .pill').click(); await wait(1500); }
+    await rider.getByTestId('gps-sim').click(); await wait(4000); }
   // 1. Mixed cart (fruit store + pharmacy) — the "₹411 for ~₹200" scenario
   await cust.goto(P + Q + '#/customer/voice'); await login(cust, PH.cust); await cust.goto(P + Q + '#/customer/voice'); await wait(1500);
   await cust.fill('textarea', '2 kg tomato, 1 thermometer, 1 paracetamol'); await cust.getByText('Understand my order').click(); await cust.getByText(/Add 3 item/).click(); await wait(800);
@@ -47,7 +50,7 @@ async function codeFor(phone) {
   const s1 = parts.find(x => x.storeId === 's1') || { id: id1 };
   // 2. Vendor accepts → auto-dispatch
   const accept = vend.getByTestId('accept-' + s1.id); await accept.waitFor({ timeout: 20000 }); await accept.click(); await wait(2500);
-  const note = await vend.getByTestId('dispatch-note').textContent().catch(() => ''); ok('vendor accept auto-assigns nearest online rider (Karthik)', /Karthik/.test(note), note); await shot(vend, '03-vendor-auto-dispatch');
+  const note = await vend.getByTestId('dispatch-note').textContent().catch(() => ''); ok('vendor accept auto-assigns nearest online rider with fresh GPS (Karthik)', /Karthik/.test(note), note); await shot(vend, '03-vendor-auto-dispatch');
   if (db) ok('order.rider = r1 in Firestore', (await db.doc('orders/' + s1.id).get()).data().rider === 'r1');
   await vend.getByText('📦 Ready for pickup').first().click(); await wait(2000);
   // 3. Rider: no OTP visible; wrong code rejected by rules; right code accepted

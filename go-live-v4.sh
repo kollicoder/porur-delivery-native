@@ -14,7 +14,7 @@ for a in customer vendor; do (cd apps/$a && npx expo export -p web --clear --out
 (cd /workspace/porur-prototype && npm run build >/dev/null)
 (cd /workspace/porur-prototype && npx vite preview --port 4174 >/tmp/pv.log 2>&1 &) ; (npx serve -s apps/customer/dist -l 8091 >/dev/null 2>&1 &); (npx serve -s apps/vendor/dist -l 8092 >/dev/null 2>&1 &); sleep 6
 # 3. live E2E with Firebase test numbers (approves vendor/rider demo users)
-npx tsx firebase/live-migrate-v04.ts || echo MIGRATE_FAILED
+node firebase/live-migrate-v04.cjs || echo MIGRATE_FAILED
 LIVE=1 TAG=live PROTO=http://localhost:4174/ NCUST=http://localhost:8091 NVEND=http://localhost:8092 node e2e-v4.cjs | tee /tmp/e2e-live-v4.txt || true
 # 4. remove the temporary admin: rules with ONLY the bootstrap admin from .admin-bootstrap.local
 bash firebase/render-rules.sh && (cd firebase && $FB deploy --only firestore:rules --project study-vignes)
