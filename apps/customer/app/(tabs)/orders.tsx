@@ -1,11 +1,11 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import { ScrollView, View, Text, Pressable } from 'react-native';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { rs, CUSTOMER_STEPS, STORES } from '@porur/shared';
 import { s } from '../../src/theme';
 import { useApp } from '../../src/store';
 export default function Orders() {
-  const { orders, refresh } = useApp(); useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  const { orders } = useApp();
   if (!orders.length) return <View style={[s.page, { alignItems: 'center', justifyContent: 'center' }]}><Text style={{ fontSize: 48 }}>📦</Text><Text style={s.muted}>No orders yet</Text></View>;
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>{orders.map(o =>
     <Pressable key={o.id} style={s.card} onPress={() => router.push(`/order/${o.id}`)}>

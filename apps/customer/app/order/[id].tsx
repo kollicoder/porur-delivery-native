@@ -1,15 +1,14 @@
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import { ScrollView, View, Text } from 'react-native';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { CUSTOMER_STEPS, Order, rs, STORES } from '@porur/shared';
+import { useLocalSearchParams } from 'expo-router';
+import { CUSTOMER_STEPS, rs, STORES, RIDERS, backendConfig } from '@porur/shared';
 import { s, C } from '../../src/theme';
 import { Btn } from '../../src/ui';
-import { api } from '../../src/store';
+import { api, useApp } from '../../src/store';
 export default function Track() {
-  const { id } = useLocalSearchParams<{ id: string }>(); const [o, setO] = useState<Order>();
-  const load = useCallback(() => { api.listOrders().then(all => setO(all.find(x => x.id === id))); }, [id]);
-  useFocusEffect(load);
-  if (!o) return <View style={s.page} />;
+  const { id } = useLocalSearchParams<{ id: string }>(); const { orders } = useApp(); const o = orders.find(x => x.id === id);
+  if (!o) return <View style={s.page}><Text style={[s.muted, { padding: 20 }]}>Loading order…</Text></View>;
+  const rider = RIDERS.find(r => r.id === o.rider);
   const idx = Math.max(0, CUSTOMER_STEPS.findIndex(x => x.key === o.status));
   const next = CUSTOMER_STEPS[idx + 1];
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>
@@ -20,7 +19,7 @@ export default function Track() {
       <Text style={{ position: 'absolute', left: `${12 + idx * 14}%`, top: `${68 - idx * 11}%`, fontSize: 26 }}>🛵</Text>
       <Text style={{ position: 'absolute', bottom: 6, right: 10, color: C.muted, fontSize: 11 }}>Map placeholder · Porur (react-native-maps later)</Text>
     </View>
-    <View style={s.card}>
+    <View style={s.card} testID="track-card">
       <Text style={{ fontSize: 18, fontWeight: '800', color: '#15803d', marginBottom: 8 }}>{o.status === 'delivered' ? 'Delivered 🎉' : `Arriving in ~${Math.max(5, 30 - idx * 5)} min`}</Text>
       {CUSTOMER_STEPS.map((st, i) => <View key={st.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 }}>
         <View style={{ width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: i <= idx ? C.green : '#d1d5db', backgroundColor: i <= idx ? C.green : '#fff' }} />
@@ -33,7 +32,9 @@ export default function Track() {
       {o.type === 'errand' ? <Text>{o.note}</Text> : o.lines.map(l => <View key={l.productId} style={s.row}><Text>{l.name}</Text><Text>×{l.qty}</Text></View>)}
       <View style={[s.row, { marginTop: 6 }]}><Text style={{ fontWeight: '800' }}>Total ({o.pay})</Text><Text style={{ fontWeight: '800' }}>{rs(o.total)}</Text></View>
     </View>
-    {next && <Btn title={`Demo: advance to "${next.label}"`} color="#64748b" onPress={async () => { await api.setStatus(o.id, next.key); load(); }} />}
-    <Text style={[s.muted, { marginTop: 6, fontSize: 12 }]}>Demo only: without a backend, the vendor/rider apps can't update this phone's order.</Text>
+    {o.status === 'rejected' && <View style={[s.card, { backgroundColor: '#fee2e2' }]}><Text>❌ The store couldn't take this order. Any UPI payment will be refunded (mock).</Text></View>}
+    {rider && <View style={s.card}><Text>🧑 <Text style={{ fontWeight: '800' }}>{rider.name}</Text> is your rider · 📞 {rider.phone}</Text></View>}
+    {backendConfig.backend === 'local' && next && <Btn title={`Demo: advance to "${next.label}"`} color="#64748b" onPress={() => api.setStatus(o.id, next.key)} />}
+    <Text style={[s.muted, { marginTop: 6, fontSize: 12 }]}>{backendConfig.backend === 'local' ? 'Offline demo mode.' : '🟢 Live — updates from the store and rider appear here automatically.'}</Text>
   </ScrollView>;
 }

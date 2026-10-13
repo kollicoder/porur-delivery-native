@@ -36,3 +36,8 @@ export const PRODUCTS: Product[] = [
   { id:'p18', store:'s3', cat:'med', name:'Digital Thermometer', ta:'தெர்மாமீட்டர்', unit:'piece', price:199, emoji:'🌡️', kw:['thermometer','தெர்மாமீட்டர்'] },
 ];
 export const productById = (id: string) => PRODUCTS.find(p => p.id === id);
+
+export interface Rider { id: string; name: string; status: 'online' | 'delivering' | 'break' | 'offline'; phone: string; today: number }
+export const RIDERS: Rider[] = ([['Karthik','online'],['Suresh','delivering'],['Prakash','online'],['Murali','delivering'],['Arun','offline'],
+  ['Vijay','online'],['Senthil','delivering'],['Ramesh','break'],['Dinesh','online'],['Bala','offline']] as const)
+  .map(([name, status], i) => ({ id: 'r' + (i + 1), name, status, phone: '98400 1' + (1000 + i * 37), today: [6,9,4,11,0,7,8,5,3,0][i] }));
