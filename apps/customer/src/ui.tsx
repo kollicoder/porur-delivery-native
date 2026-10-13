@@ -24,7 +24,7 @@ export function ProductRow({ p }: { p: Product & { inStock?: boolean } }) {
   </View>;
 }
 export function CartBar() {
-  const { cart } = useApp(); const { lines, subtotal } = cartTotals(cart); if (!lines.length) return null;
+  const { cart, products, settings } = useApp(); const { lines, subtotal } = cartTotals(cart, products, settings); if (!lines.length) return null;
   return <Pressable onPress={() => router.push('/cart')} style={{ position:'absolute', bottom:12, left:14, right:14, backgroundColor:C.green, borderRadius:14, padding:14, flexDirection:'row', justifyContent:'space-between' }}>
     <Text style={{ color:'#fff' }}>{lines.length} item(s) · {rs(subtotal)}</Text><Text style={{ color:'#fff', fontWeight:'800' }}>View cart →</Text></Pressable>;
 }

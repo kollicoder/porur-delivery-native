@@ -1,2 +1,1 @@
-{"name":"@porur/shared","version":"0.1.0","private":true,"main":"src/index.ts","types":"src/index.ts",
-"peerDependencies":{"@react-native-async-storage/async-storage":"*"}}
+{"name":"@porur/shared","version":"0.1.0","private":true,"main":"src/index.ts","types":"src/index.ts","peerDependencies":{"@react-native-async-storage/async-storage":"*"},"dependencies":{"firebase":"^13.0.0"}}

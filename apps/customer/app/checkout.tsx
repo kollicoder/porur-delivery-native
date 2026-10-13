@@ -2,23 +2,27 @@ import React, { useState } from 'react';
 import { ScrollView, View, Text, TextInput, Pressable, Image } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { cartTotals, buildOrders, rs, productById } from '@porur/shared';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { cartTotals, buildOrders, rs } from '@porur/shared';
 import { s, C } from '../src/theme';
 import { Btn } from '../src/ui';
 import { useApp, api, ME } from '../src/store';
 export default function Checkout() {
-  const { cart, clear, refresh } = useApp(); const { lines, total, needsRx } = cartTotals(cart);
+  const { cart, clear, products, settings, uid } = useApp(); const { lines, total, needsRx } = cartTotals(cart, products, settings);
   const [addr, setAddr] = useState('Flat 2A, Sri Sai Apartments, Mount-Poonamallee Rd, Porur'); const [pay, setPay] = useState<'UPI' | 'COD'>('UPI');
   const [rx, setRx] = useState<string>(); const [busy, setBusy] = useState(false);
-  const hasMed = lines.some(l => productById(l.productId)?.cat === 'med');
+  const hasMed = lines.some(l => products.find(p => p.id === l.productId)?.cat === 'med');
   const pick = async (camera: boolean) => {
     const r = camera ? await ImagePicker.launchCameraAsync({ quality: 0.6 }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (!r.canceled) setRx(r.assets[0].uri);
+    if (r.canceled) return;
+    // No Firebase Storage on the free plan: shrink to ~600px JPEG and keep it inline (base64) in the order doc
+    const m = await ImageManipulator.manipulateAsync(r.assets[0].uri, [{ resize: { width: 600 } }], { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true });
+    setRx('data:image/jpeg;base64,' + m.base64);
   };
   const place = async () => {
     setBusy(true); await new Promise(r => setTimeout(r, pay === 'UPI' ? 900 : 200)); // mock UPI
-    const orders = buildOrders(cart, { ...ME, address: addr, pay, prescriptionUri: rx });
-    await api.createOrders(orders); clear(); await refresh(); router.replace(`/order/${orders[0].id}`);
+    const orders = buildOrders(cart, { ...ME, customerUid: uid, address: addr, pay, prescriptionUri: rx }, products, settings);
+    await api.createOrders(orders); clear(); router.replace(`/order/${orders[0].id}`);
   };
   if (!lines.length) return <View style={s.page}><Text style={[s.muted, { padding: 20 }]}>Cart is empty.</Text></View>;
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>

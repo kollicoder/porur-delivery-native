@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, Pressable } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { Order, OrderStatus, rs, PRODUCTS } from '@porur/shared';
+import { Order, OrderStatus, rs, PRODUCTS, RIDERS } from '@porur/shared';
 import { s, C } from '../../src/theme';
 import { useVendor, api } from '../../src/store';
 const LABEL: Partial<Record<OrderStatus, [string, string]>> = { placed: ['NEW', '#dc2626'], accepted: ['PREPARING', '#d97706'], ready: ['READY', '#2563eb'], picked_up: ['PICKED UP', '#16a34a'], on_the_way: ['PICKED UP', '#16a34a'], delivered: ['DONE', '#64748b'], rejected: ['REJECTED', '#64748b'] };
@@ -32,7 +32,8 @@ export default function Orders() {
           <Pressable onPress={() => set(o, 'rejected')} style={[s.btn, { flex: 1, backgroundColor: '#fee2e2', marginTop: 0 }]}><Text style={{ color: '#991b1b', fontWeight: '800' }}>Reject</Text></Pressable>
           <Pressable testID={'accept-' + o.id} onPress={() => !rxBlock && set(o, 'accepted')} style={[s.btn, { flex: 2, marginTop: 0, backgroundColor: rxBlock ? '#9ca3af' : C.green }]}><Text style={s.btnTxt}>Accept</Text></Pressable></View>}
         {o.status === 'accepted' && <Pressable onPress={() => set(o, 'ready')} style={[s.btn, { backgroundColor: '#2563eb' }]}><Text style={s.btnTxt}>📦 Ready for pickup</Text></Pressable>}
-        {o.status === 'ready' && <Text style={[s.muted, { marginTop: 8 }]}>Waiting for rider… <Text style={{ color: C.green }} onPress={() => set(o, 'picked_up')}>(demo: mark picked up)</Text></Text>}
+        {o.status === 'ready' && <Text style={[s.muted, { marginTop: 8 }]}>📦 Packed. Waiting for rider {RIDERS.find(r => r.id === o.rider)?.name ?? ''}…</Text>}
+        {['picked_up', 'on_the_way', 'delivered'].includes(o.status) && <Text style={[s.muted, { marginTop: 8 }]}>🛵 {o.status === 'delivered' ? 'Delivered' : 'Picked up'} by {RIDERS.find(r => r.id === o.rider)?.name ?? 'rider'}</Text>}
       </View>; })}
   </ScrollView>;
 }
