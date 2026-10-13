@@ -41,8 +41,8 @@ const results = []; const ok = (n, c) => { results.push((c ? 'PASS ' : 'FAIL ') 
   ok('admin board shows Delivered', (await admin.locator('.kcol', { hasText: 'Delivered' }).textContent()).includes(id)); await shot(admin, '06-admin-delivered');
   // 8. Vendor stock toggle + price edit -> native customer app (web export)
   await vend.goto(NV + '/catalogue'); await wait(2500);
-  await vend.getByRole('switch').first().click(); await wait(1500); // Tomato out of stock
-  await ncust.goto(NC + '/category/fv'); await wait(3500);
+  await vend.getByRole('switch').first().click(); await wait(4000); // Tomato out of stock
+  await ncust.goto(NC + '/category/fv'); await ncust.getByText('Out of stock').first().waitFor({ timeout: 15000 }).catch(() => {});
   ok('vendor stock toggle shows "Out of stock" in native customer app', (await ncust.textContent('body')).includes('Out of stock')); await shot(ncust, '07-native-customer-out-of-stock');
   await ncust.getByTestId('add-p2').click(); await ncust.getByTestId('add-p5').click(); await ncust.goto(NC + '/cart'); await wait(2500);
   ok('admin fee (₹30) applied in native customer cart', (await ncust.textContent('body')).includes('₹30')); await shot(ncust, '08-native-customer-cart');
