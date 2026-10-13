@@ -11,11 +11,11 @@ const Step = ({ v, set, min, max, unit }: { v: number; set: (n: number) => void;
     <Text style={{ fontWeight: '800', fontSize: 18 }}>{v} {unit}</Text>
     <Pressable style={s.chip} onPress={() => set(Math.min(max, v + 0.5 * (unit === 'km' ? 1 : 2)))}><Text style={{ fontSize: 18 }}>+</Text></Pressable></View>;
 export default function Rider() {
-  const { settings, uid, who, pushToken } = useApp();
+  const { settings, uid, who, pushToken, riders } = useApp(); const [pay, setPay] = useState<'COD' | 'UPI_DOD'>('COD');
   const [mode, setMode] = useState<'trip' | 'hour'>('trip'); const [pickup, setPickup] = useState('Saravana Stores, Porur Junction');
   const [drop, setDrop] = useState('Flat 2A, Sri Sai Apartments, Porur'); const [task, setTask] = useState('Pick up a parcel and hand it over at home');
   const [km, setKm] = useState(3); const [hours, setHours] = useState(1); const price = errandPrice(mode, km, hours, settings);
-  const book = async () => { const e = buildErrand({ pickup, drop, task, price, ...who, customerUid: uid, dropLat: 13.0482, dropLng: 80.1685, customerPushToken: pushToken }); await api.createOrders([e]); router.replace(`/order/${e.id}`); };
+  const book = async () => { const e = buildErrand({ pickup, drop, task, price, ...who, customerUid: uid, dropLat: 13.0482, dropLng: 80.1685, customerPushToken: pushToken, pay }); await api.createOrders([e], { riders }); router.replace(`/order/${e.id}`); };
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>
     <Text style={s.muted}>Anything, anywhere in Porur — pick up, drop, buy & bring, stand in a queue.</Text>
     <View style={{ flexDirection: 'row', backgroundColor: '#e5e7eb', borderRadius: 12, padding: 4, marginTop: 10 }}>
@@ -28,6 +28,8 @@ export default function Rider() {
     {mode === 'trip' ? <Step v={km} set={setKm} min={1} max={8} unit="km" /> : <Step v={hours} set={setHours} min={1} max={6} unit="hr" />}
     <View style={s.card}><View style={s.row}><Text style={{ fontWeight: '800', fontSize: 16 }}>Estimated price</Text><Text style={{ fontWeight: '800', fontSize: 18, color: C.green }}>{rs(price)}</Text></View>
       <Text style={s.muted}>{mode === 'trip' ? `${rs(settings.errandBase)} for first 3 km, ${rs(settings.errandPerKm)} per extra km` : `${rs(settings.errandHour)} per hour`} · item cost (if buying) paid separately</Text></View>
+    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>{([['COD', '💵 Cash'], ['UPI_DOD', '📱 UPI']] as const).map(([k, n]) => <Pressable key={k} onPress={() => setPay(k)} style={[s.chip, pay === k && { borderColor: C.green, backgroundColor: '#f0fdf4' }]}><Text>{pay === k ? '◉ ' : '○ '}{n} on delivery</Text></Pressable>)}</View>
+    <Text style={[s.muted, { fontSize: 12 }]}>We assign the nearest available rider automatically.</Text>
     <Btn testID="book" title={`Book rider · ${rs(price)}`} onPress={book} />
   </ScrollView>;
 }

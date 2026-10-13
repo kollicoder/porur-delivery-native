@@ -1,10 +1,13 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, initializeAuth, connectAuthEmulator, Auth, signInWithPhoneNumber, ConfirmationResult, ApplicationVerifier, onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { initializeFirestore, connectFirestoreEmulator, Firestore, collection, doc, onSnapshot, query, where, writeBatch, updateDoc, setDoc, getDoc, deleteField } from 'firebase/firestore';
+import { initializeFirestore, connectFirestoreEmulator, Firestore, collection, doc, onSnapshot, query, where, writeBatch, updateDoc, setDoc, getDoc, getDocs, deleteField } from 'firebase/firestore';
 import { backendConfig } from './config';
 import type { PorurApi, OrderFilter, ProductOverride, Role, Unsub, UserProfile, AccessRequest } from './api';
 import { sortOrders } from './api';
 import type { Order, OrderStatus, LiveProduct } from './orders';
+import { newOtp } from './orders';
+import { pickRider } from './dispatch';
+import { sendPushMany } from './push';
 import type { Rider } from './catalogue';
 import { DEFAULT_SETTINGS, Settings } from './pricing';
 
@@ -105,15 +108,59 @@ export class FirestoreApi implements PorurApi {
   watchRiders(cb: (r: Rider[]) => void): Unsub {
     return this.defer(() => onSnapshot(collection(this.db, 'riders'), s => cb(s.docs.map(d => d.data() as Rider).sort((a, b) => +a.id.slice(1) - +b.id.slice(1))), e => console.warn('riders', e)));
   }
-  async createOrders(orders: Order[]) {
+  /** Creates the order docs plus, in the same batch, the private orderSecrets/{id} (delivery OTP — customer + admin only)
+   *  and prescriptions/{id} (photo — customer, that store's vendor, admin; never riders). Errands are auto-dispatched here. */
+  async createOrders(orders: Order[], opts: { prescription?: string; riders?: Rider[] } = {}) {
     await this.ready;
-    const b = writeBatch(this.db); const now = new Date().toISOString();
+    const b = writeBatch(this.db); const now = new Date().toISOString(); const otps: Record<string, string> = {};
     for (const o of orders) {
-      const d = clean({ ...o, customerUid: this._uid, rider: o.rider ?? 'r1', updatedAt: now });
+      const { otp: _legacy, prescriptionUri: _p, ...rest } = o as any;
+      const rider = o.rider ?? (o.type === 'errand' && opts.riders ? pickRider(opts.riders, o.dropLat ? { lat: o.dropLat, lng: o.dropLng! } : undefined) : undefined);
+      const d = clean({ ...rest, customerUid: this._uid, ...(rider ? { rider } : {}), updatedAt: now });
       b.set(doc(this.db, 'orders', o.id), d);
+      otps[o.id] = newOtp();
+      b.set(doc(this.db, 'orderSecrets', o.id), { otp: otps[o.id], customerUid: this._uid, createdAt: now });
+      if (o.hasRxPhoto && opts.prescription) b.set(doc(this.db, 'prescriptions', o.id), { img: opts.prescription, storeId: o.storeId ?? '', customerUid: this._uid, createdAt: now });
       if (o.type === 'errand') b.set(doc(this.db, 'errands', o.id), { orderId: o.id, note: o.note ?? '', createdAt: o.createdAt, customerUid: this._uid });
     }
     await b.commit();
+    // notify the stores (vendor app) / assigned errand rider — best effort, from the client (no server on Spark)
+    for (const o of orders) { if (o.storeId) this.pushTo({ storeId: o.storeId }, '🛎️ New order ' + o.id, `${o.customer} · ₹${o.total}`);
+      else if (o.rider) this.pushTo({ riderId: o.rider }, '🛵 New errand ' + o.id, o.note ?? ''); }
+    return otps;
+  }
+  /** Customer/admin only: the delivery OTP. */
+  watchSecret(id: string, cb: (otp: string | null) => void): Unsub {
+    return this.defer(() => onSnapshot(doc(this.db, 'orderSecrets', id), s => cb(s.exists() ? (s.data() as any).otp : null), () => cb(null)));
+  }
+  watchPrescription(id: string, cb: (img: string | null) => void): Unsub {
+    return this.defer(() => onSnapshot(doc(this.db, 'prescriptions', id), s => cb(s.exists() ? (s.data() as any).img : null), () => cb(null)));
+  }
+  /** Vendor accepts → auto-assign an available rider (nearest fresh GPS to the store, else least busy). Admin can reassign later. */
+  async acceptOrder(o: Order, riders: Rider[], from?: { lat: number; lng: number }) {
+    const rider = o.rider || pickRider(riders, from);
+    await this.updateOrder(o.id, { status: 'accepted', ...(rider ? { rider } : {}) });
+    return rider;
+  }
+  /** Rider: submit the code the customer reads out. Firestore rules compare it with orderSecrets/{id}.otp. */
+  async deliver(id: string, code: string, collectedVia?: 'cash' | 'upi') {
+    const now = new Date().toISOString();
+    await this.updateOrder(id, { status: 'delivered', deliveryCode: code, deliveredAt: now, ...(collectedVia ? { paymentStatus: 'collected', collectedVia } : {}) });
+  }
+  // ---------- Push (Expo push service, sent from the client) ----------
+  /** pushTokens/{uid}: token + the store/rider this device belongs to (rules check these match users/{uid}). */
+  async registerPushToken(token: string, me?: { role?: string; storeId?: string; riderId?: string } | null) {
+    await this.ready;
+    const d: any = { token, updatedAt: new Date().toISOString() };
+    if (me?.role === 'vendor' && me.storeId) d.storeId = me.storeId; if (me?.role === 'rider' && me.riderId) d.riderId = me.riderId;
+    await setDoc(doc(this.db, 'pushTokens', this._uid!), d);
+  }
+  async pushTo(to: { storeId?: string; riderId?: string }, title: string, body: string) {
+    try {
+      const k = to.storeId ? 'storeId' : 'riderId', v = to.storeId || to.riderId; if (!v) return;
+      const s = await getDocs(query(collection(this.db, 'pushTokens'), where(k, '==', v)));
+      await sendPushMany(s.docs.map(d => (d.data() as any).token), title, body);
+    } catch (e) { console.warn('pushTo', e); }
   }
   async updateOrder(id: string, patch: Partial<Order>) { await this.ready; return updateDoc(doc(this.db, 'orders', id), clean({ ...patch, updatedAt: new Date().toISOString() })); }
   setStatus(id: string, status: OrderStatus) { return this.updateOrder(id, { status }); }

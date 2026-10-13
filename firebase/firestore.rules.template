@@ -1,5 +1,5 @@
 rules_version = '2';
-// Porur Delivery — Firestore rules (v0.3: phone auth + admin-assigned roles).
+// Porur Delivery — Firestore rules (v0.4: private delivery OTP, rider auto-dispatch, pay-on-delivery, private prescriptions, push tokens).
 // __ADMIN_PHONES__ is replaced at deploy time from firebase/.admin-bootstrap.local (never committed).
 service cloud.firestore {
   match /databases/{db}/documents {
@@ -14,6 +14,9 @@ service cloud.firestore {
     function isRiderId(riderId) { return signedIn() && hasProfile() && me().get('role', '') == 'rider' && me().get('riderId', '') == riderId; }
     function changes() { return request.resource.data.diff(resource.data).affectedKeys(); }
     function onlyChanges(keys) { return changes().hasOnly(keys); }
+    function riderAvailable(r) { return exists(/databases/$(db)/documents/riders/$(r))
+                                  && get(/databases/$(db)/documents/riders/$(r)).data.status in ['online', 'delivering']; }
+    function secret(id) { return get(/databases/$(db)/documents/orderSecrets/$(id)).data; }
 
     match /users/{uid} {
       allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
@@ -42,15 +45,56 @@ service cloud.firestore {
         || (signedIn() && resource.data.customerUid == request.auth.uid)
         || isVendorOf(resource.data.get('storeId', ''))
         || isRiderId(resource.data.get('rider', ''));
-      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid && request.resource.data.status == 'placed';
+      // Customer creates own order: status placed, no OTP / proof-of-delivery / payment-collected fields,
+      // and the private OTP doc must be created in the same batch. Errands may arrive pre-assigned to an available rider.
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid && request.resource.data.status == 'placed'
+        && !request.resource.data.keys().hasAny(['otp', 'deliveryCode', 'deliveredAt', 'prescriptionUri'])
+        && request.resource.data.get('paymentStatus', 'due') == 'due'
+        && request.resource.data.get('pay', 'COD') in ['COD', 'UPI_DOD']
+        && existsAfter(/databases/$(db)/documents/orderSecrets/$(id))
+        && (!request.resource.data.keys().hasAny(['rider']) || riderAvailable(request.resource.data.rider));
       allow update: if isAdmin()
-        || (isVendorOf(resource.data.get('storeId', '')) && onlyChanges(['status', 'rxStatus', 'updatedAt'])
-            && request.resource.data.status in ['placed', 'accepted', 'rejected', 'ready'])
-        || (isRiderId(resource.data.get('rider', '')) && onlyChanges(['status', 'updatedAt'])
-            && request.resource.data.status in ['accepted', 'picked_up', 'on_the_way', 'delivered'])
+        // Vendor: accept/reject/ready + Rx review; on ACCEPT it may assign an available rider (client-side dispatch).
+        || (isVendorOf(resource.data.get('storeId', '')) && onlyChanges(['status', 'rxStatus', 'updatedAt', 'rider'])
+            && request.resource.data.status in ['placed', 'accepted', 'rejected', 'ready']
+            && (!changes().hasAny(['rider']) || (resource.data.get('rider', '') == '' && request.resource.data.status == 'accepted'
+                                                   && riderAvailable(request.resource.data.rider))))
+        // Rider: progress the trip. 'delivered' only with the customer's OTP, verified against the private doc.
+        || (isRiderId(resource.data.get('rider', '')) && onlyChanges(['status', 'updatedAt', 'deliveryCode', 'deliveredAt', 'paymentStatus', 'collectedVia'])
+            && request.resource.data.status in ['accepted', 'picked_up', 'on_the_way', 'delivered']
+            && resource.data.status != 'delivered'
+            && (request.resource.data.status == 'delivered'
+                  ? request.resource.data.get('deliveryCode', '') == secret(id).otp
+                  : !changes().hasAny(['deliveryCode', 'deliveredAt', 'paymentStatus', 'collectedVia'])))
         || (signedIn() && resource.data.customerUid == request.auth.uid && onlyChanges(['status', 'updatedAt'])
             && resource.data.status == 'placed' && request.resource.data.status == 'rejected');
       allow delete: if isAdmin();
+    }
+    // Delivery OTP: only the customer (and admin). Riders/vendors can never read it.
+    match /orderSecrets/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.otp is string && request.resource.data.otp.matches('^[0-9]{4}$')
+        && getAfter(/databases/$(db)/documents/orders/$(id)).data.customerUid == request.auth.uid
+        && !exists(/databases/$(db)/documents/orders/$(id));
+      allow update, delete: if isAdmin();
+    }
+    // Prescription photo (Spark plan has no Storage bucket): own doc, size-capped (~300 KB base64), never readable by riders.
+    match /prescriptions/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid) || isVendorOf(resource.data.get('storeId', ''));
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.img is string && request.resource.data.img.size() < 300000
+        && getAfter(/databases/$(db)/documents/orders/$(id)).data.customerUid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+    // Expo push tokens. Any signed-in user can look up a store's / rider's devices to notify them (no server on Spark).
+    match /pushTokens/{uid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == uid && request.resource.data.token is string
+        && request.resource.data.keys().hasOnly(['token', 'storeId', 'riderId', 'updatedAt'])
+        && (!request.resource.data.keys().hasAny(['storeId']) || isVendorOf(request.resource.data.storeId))
+        && (!request.resource.data.keys().hasAny(['riderId']) || isRiderId(request.resource.data.riderId));
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
     match /errands/{id} {
       allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);

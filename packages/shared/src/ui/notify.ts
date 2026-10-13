@@ -23,8 +23,6 @@ export async function localNotify(title: string, body: string) {
   if (N) await N.scheduleNotificationAsync({ content: { title, body, sound: true }, trigger: null });
 }
 /** Remote push via Expo's push service (works from the app; no server of our own). */
-export async function sendPush(token: string | undefined, title: string, body: string) {
-  if (!token || Platform.OS === 'web') return;
-  try { await fetch('https://exp.host/--/api/v2/push/send', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ to: token, title, body, sound: 'default', channelId: 'orders' }) }); } catch {}
-}
+import { sendPushMany } from '../push';
+export async function sendPush(token: string | undefined, title: string, body: string) { await sendPushMany([token], title, body); }
 export const STATUS_TEXT: Record<string, string> = { placed: 'Order placed', accepted: 'Store accepted your order', ready: 'Packed and ready for pickup', picked_up: 'Rider picked up your order', on_the_way: 'Rider is on the way', delivered: 'Delivered — enjoy!', rejected: 'Store could not take the order' };
