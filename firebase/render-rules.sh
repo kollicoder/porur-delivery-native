@@ -5,5 +5,5 @@ set -euo pipefail; cd "$(dirname "$0")"
 [ -f .admin-bootstrap.local ] || { echo "missing firebase/.admin-bootstrap.local (BOOTSTRAP_ADMIN_PHONE=+91...)"; exit 1; }
 . ./.admin-bootstrap.local
 phones="'$BOOTSTRAP_ADMIN_PHONE'"; [ -n "${1:-}" ] && phones="$phones, '$1'"
-sed "s|__ADMIN_PHONES__|$phones|" firestore.rules.template > firestore.rules
+sed "s|__ADMIN_PHONES__|$phones|" firestore.rules.template > .firestore.rules.tmp && mv .firestore.rules.tmp firestore.rules
 echo "rendered firestore.rules with admins: $phones"
