@@ -7,10 +7,14 @@ import { cartTotals, buildOrders, rs } from '@porur/shared';
 import { s, C } from '../src/theme';
 import { Btn } from '../src/ui';
 import { useApp, api } from '../src/store';
+import { MapView } from '@porur/shared/src/ui/MapView';
 export default function Checkout() {
   const { cart, clear, products, settings, uid, who, pushToken } = useApp(); const { lines, total, needsRx } = cartTotals(cart, products, settings);
   const [addr, setAddr] = useState('Flat 2A, Sri Sai Apartments, Mount-Poonamallee Rd, Porur'); const [pay, setPay] = useState<'UPI' | 'COD'>('UPI');
   const [rx, setRx] = useState<string>(); const [busy, setBusy] = useState(false);
+  const [loc, setLoc] = useState({ lat: 13.0502, lng: 80.1655 }); const [locMsg, setLocMsg] = useState('');
+  const useMyLoc = () => { const g = (globalThis as any).navigator?.geolocation; if (!g) { setLocMsg('Location unavailable — pin set to your address'); return; }
+    setLocMsg('Finding you…'); g.getCurrentPosition((p: any) => { setLoc({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocMsg(`📍 Pinned · ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`); }, () => setLocMsg('Location permission denied — using your address'), { timeout: 8000 }); };
   const hasMed = lines.some(l => products.find(p => p.id === l.productId)?.cat === 'med');
   const pick = async (camera: boolean) => {
     const r = camera ? await ImagePicker.launchCameraAsync({ quality: 0.6 }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
@@ -21,12 +25,15 @@ export default function Checkout() {
   };
   const place = async () => {
     setBusy(true); await new Promise(r => setTimeout(r, pay === 'UPI' ? 900 : 200)); // mock UPI
-    const orders = buildOrders(cart, { ...who, customerUid: uid, address: addr, pay, prescriptionUri: rx, dropLat: 13.0502, dropLng: 80.1655, customerPushToken: pushToken }, products, settings);
+    const orders = buildOrders(cart, { ...who, customerUid: uid, address: addr, pay, prescriptionUri: rx, dropLat: loc.lat, dropLng: loc.lng, customerPushToken: pushToken }, products, settings);
     await api.createOrders(orders); clear(); router.replace(`/order/${orders[0].id}`);
   };
   if (!lines.length) return <View style={s.page}><Text style={[s.muted, { padding: 20 }]}>Cart is empty.</Text></View>;
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>
     <Text style={s.label}>Deliver to</Text><TextInput style={s.input} multiline value={addr} onChangeText={setAddr} />
+    <View style={{ marginTop: 8 }}><MapView testID="checkout-map" height={150} pins={[{ lat: loc.lat, lng: loc.lng, emoji: '📍', label: 'Deliver here' }]} center={loc} /></View>
+    <Pressable testID="use-loc" onPress={useMyLoc} style={[s.chip, { alignSelf: 'flex-start', marginTop: 8 }]}><Text>📍 Use my current location</Text></Pressable>
+    {!!locMsg && <Text style={s.muted}>{locMsg}</Text>}
     {(hasMed || needsRx) && <View style={s.card}>
       <Text style={{ fontWeight: '800' }}>📄 Prescription {needsRx ? '(required)' : '(optional)'}</Text>
       <Text style={s.muted}>A licensed pharmacist verifies before dispatch. (Prototype: stays on this phone.)</Text>

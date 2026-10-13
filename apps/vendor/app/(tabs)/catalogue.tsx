@@ -6,7 +6,7 @@ import { useVendor, useProducts, api } from '../../src/store';
 export default function Catalogue() {
   const { refresh } = useVendor(); const products = useProducts(); const [edit, setEdit] = useState<string>(); const [val, setVal] = useState('');
   return <ScrollView style={s.page} contentContainerStyle={s.pad}>
-    <Text style={s.muted}>{products.filter(p => p.inStock).length}/{products.length} items in stock. Changes apply to the customer app once a backend connects them.</Text>
+    <Text style={s.muted}>{products.filter(p => p.inStock).length}/{products.length} items in stock. Price and stock changes show in the customer app instantly.</Text>
     {products.map(p => <View key={p.id} style={[s.card, { flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
       <Text style={{ fontSize: 26 }}>{p.emoji}</Text>
       <View style={{ flex: 1 }}><Text style={{ fontWeight: '700' }}>{p.name}</Text><Text style={[s.muted, { fontFamily: TA }]}>{p.ta} · per {p.unit}</Text>
