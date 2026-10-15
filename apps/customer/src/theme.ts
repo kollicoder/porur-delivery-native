@@ -1,13 +1,16 @@
 import { StyleSheet } from 'react-native';
-export const C = { green:'#16a34a', dark:'#111827', muted:'#6b7280', bg:'#f8fafc', card:'#fff', orange:'#f97316', line:'#e5e7eb' };
-export const TA = 'NotoSansTamil_400Regular';
+import { K, F } from '@porur/shared/src/ui/kit';
+export { K, F };
+// v0.5: legacy names mapped onto the ding-dong palette (AA contrast)
+export const C = { green: K.green, dark: K.ink, muted: K.muted, bg: K.bg, card: K.card, orange: K.orange, line: K.line, yellow: K.yellow };
+export const TA = F.ta;
 export const s = StyleSheet.create({
-  page:{ flex:1, backgroundColor:C.bg }, pad:{ padding:14, paddingBottom:120 },
-  card:{ backgroundColor:C.card, borderRadius:14, padding:12, marginVertical:6, shadowColor:'#000', shadowOpacity:0.06, shadowRadius:4, elevation:1 },
-  h1:{ fontSize:22, fontWeight:'800', color:C.dark }, h3:{ fontSize:16, fontWeight:'700', marginTop:16, marginBottom:8, color:C.dark },
-  muted:{ color:C.muted, fontSize:13 }, row:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
-  btn:{ backgroundColor:C.green, borderRadius:12, padding:14, alignItems:'center', marginTop:12 }, btnTxt:{ color:'#fff', fontWeight:'700', fontSize:15 },
-  input:{ borderWidth:1.5, borderColor:'#d1d5db', borderRadius:12, padding:11, fontSize:15, backgroundColor:'#fff' },
-  label:{ fontWeight:'600', fontSize:13, marginTop:12, marginBottom:5, color:'#374151' },
-  chip:{ borderWidth:1, borderColor:'#d1d5db', borderRadius:20, paddingHorizontal:11, paddingVertical:5, backgroundColor:'#fff', marginRight:6, marginBottom:6 },
+  page: { flex: 1, backgroundColor: K.bg }, pad: { padding: 16, paddingBottom: 130 },
+  card: { backgroundColor: K.card, borderRadius: 20, padding: 14, marginVertical: 6, borderWidth: 1, borderColor: K.line },
+  h1: { fontSize: 26, fontFamily: F.display, color: K.ink }, h3: { fontSize: 19, fontFamily: F.display, marginTop: 18, marginBottom: 8, color: K.ink },
+  muted: { color: K.muted, fontSize: 13, fontFamily: F.body }, row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  btn: { backgroundColor: K.ink, borderRadius: 999, minHeight: 52, padding: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 }, btnTxt: { color: '#fff', fontFamily: F.bold, fontSize: 16 },
+  input: { borderWidth: 1.5, borderColor: K.line, borderRadius: 16, padding: 13, fontSize: 16, backgroundColor: '#fff', fontFamily: F.body, color: K.ink },
+  label: { fontFamily: F.bold, fontSize: 14, marginTop: 14, marginBottom: 6, color: K.ink2 },
+  chip: { borderWidth: 1, borderColor: K.line, borderRadius: 999, paddingHorizontal: 14, minHeight: 44, justifyContent: 'center', backgroundColor: '#fff', marginRight: 8, marginBottom: 8 },
 });
