@@ -12,3 +12,4 @@ ui-debug.log
 *.local
 firebase/firestore.rules
 .firestore.rules.tmp
+**/dist-emu

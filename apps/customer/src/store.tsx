@@ -9,21 +9,23 @@ export const api = getApi([]) as FirestoreApi;
 export const ME = { customer: 'Customer', phone: '' };
 type Ctx = { cart: Cart; setQty: (id: string, q: number) => void; addMany: (m: Record<string, number>) => void; clear: () => void;
   orders: Order[]; refresh: () => Promise<void>; products: LiveProduct[]; settings: Settings; uid?: string; user?: User | null; me?: UserProfile | null;
-  riders: Rider[]; pushToken?: string; who: { customer: string; phone: string } };
+  riders: Rider[]; pushToken?: string; who: { customer: string; phone: string }; ordersReady: boolean; productsReady: boolean; lang: Lang; setLang: (l: Lang) => void; t: (en: string, ta: string) => string };
+export type Lang = 'en' | 'ta';
 const Ctx = createContext<Ctx>(null as any);
 export const useApp = () => useContext(Ctx);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<Cart>({}); const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<LiveProduct[]>(PRODUCTS); const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [user, setUser] = useState<User | null | undefined>(undefined); const [me, setMe] = useState<UserProfile | null>(null);
-  const [riders, setRiders] = useState<Rider[]>(RIDERS); const [pushToken, setPushToken] = useState<string>();
+  const [riders, setRiders] = useState<Rider[]>(RIDERS); const [ordersReady, setOrdersReady] = useState(false); const [productsReady, setProductsReady] = useState(false); const [lang, setLangS] = useState<Lang>('en'); const [pushToken, setPushToken] = useState<string>();
+  useEffect(() => { AsyncStorage.getItem('porur.lang').then(l => (l === 'ta' || l === 'en') && setLangS(l)); }, []);
   useEffect(() => { AsyncStorage.getItem('porur.cart').then(c => c && setCart(JSON.parse(c))); }, []);
   useEffect(() => { AsyncStorage.setItem('porur.cart', JSON.stringify(cart)); }, [cart]);
   useEffect(() => api.onAuth(setUser), []);
   useEffect(() => {
     if (!user) return;
-    const subs = [api.watchProducts(p => p.length && setProducts(p)), api.watchSettings(setSettings), api.watchRiders(r => r.length && setRiders(r)),
-      api.watchOrders({ customerUid: 'me' }, setOrders), api.watchMe(setMe)];
+    const subs = [api.watchProducts(p => { setProductsReady(true); if (p.length) setProducts(p); }), api.watchSettings(setSettings), api.watchRiders(r => r.length && setRiders(r)),
+      api.watchOrders({ customerUid: 'me' }, o => { setOrders(o); setOrdersReady(true); }), api.watchMe(setMe)];
     setupNotifications().then(r => { if (r.pushToken) { setPushToken(r.pushToken); api.updateMe({ pushToken: r.pushToken }).catch(() => {}); api.registerPushToken(r.pushToken).catch(() => {}); } }).catch(() => {});
     return () => subs.forEach(f => f());
   }, [user]);
@@ -36,5 +38,5 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const setQty = (id: string, q: number) => setCart(c => { const x = { ...c }; if (q <= 0) delete x[id]; else x[id] = Math.round(q * 2) / 2; return x; });
   const addMany = (m: Record<string, number>) => setCart(c => { const x = { ...c }; for (const k in m) x[k] = (x[k] || 0) + m[k]; return x; });
   const who = { customer: me?.name || user?.phoneNumber || 'Customer', phone: user?.phoneNumber || '' };
-  return <Ctx.Provider value={{ cart, setQty, addMany, clear: () => setCart({}), orders, refresh: async () => {}, products, settings, uid: user?.uid, user, me, riders, pushToken, who }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ cart, setQty, addMany, clear: () => setCart({}), orders, refresh: async () => {}, products, settings, uid: user?.uid, user, me, riders, pushToken, who, ordersReady, productsReady, lang, setLang: (l: Lang) => { setLangS(l); AsyncStorage.setItem('porur.lang', l); }, t: (en: string, ta: string) => lang === 'ta' ? ta : en }}>{children}</Ctx.Provider>;
 }
