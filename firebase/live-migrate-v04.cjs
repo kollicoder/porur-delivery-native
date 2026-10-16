@@ -1,6 +1,6 @@
 // ONE-OFF v0.4 migration on LIVE via REST (Node can't use the phone-auth SDK): sign in with an admin TEST number,
 // move delivery OTPs off order docs into orderSecrets/{id}, inline prescription photos into prescriptions/{id}.
-const K = 'AIzaSyASMmblBvKh9R381485V5GtE9itW3dtSgA', P = 'study-vignes', PHONE = process.env.MIG_PHONE || '+16505550000', CODE = process.env.MIG_CODE || '000000';
+const K = 'AIzaSyASMmblBvKh9R381485V5GtE9itW3dtSgA', P = 'study-vignes', PHONE = process.env.MIG_PHONE || '+919000000000', CODE = process.env.MIG_CODE || '000000';
 const j = async (u, o) => { const r = await fetch(u, o); const t = await r.json(); if (!r.ok) throw new Error(u.split('?')[0] + ' ' + JSON.stringify(t.error || t)); return t; };
 const post = (u, b, tok) => j(u, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: 'Bearer ' + tok } : {}) }, body: JSON.stringify(b) });
 (async () => {

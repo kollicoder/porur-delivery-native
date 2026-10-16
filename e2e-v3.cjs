@@ -3,8 +3,8 @@ const { chromium } = require('/workspace/porur-prototype/node_modules/playwright
 const env = process.env;
 const [P, NC, NV, TAG] = [env.PROTO || 'http://localhost:4173/', env.NCUST || 'http://localhost:8081', env.NVEND || 'http://localhost:8082', env.TAG || 'emu-v3'];
 const LIVE = !!env.LIVE; const Q = LIVE ? '?test=1' : '';
-const PH = { admin: env.ADMIN || '+16505550000', cust: env.CUST || '+16505550001', vend: env.VEND || '+16505550002', rider: env.RIDER || '+16505550004' };
-const LIVECODE = { '+16505550000': '000000', '+16505550001': '111111', '+16505550002': '222222', '+16505550003': '333333', '+16505550004': '444444' };
+const PH = { admin: env.ADMIN || '+919000000000', cust: env.CUST || '+919000000001', vend: env.VEND || '+919000000002', rider: env.RIDER || '+919000000004' };
+const LIVECODE = { '+919000000000': '000000', '+919000000001': '111111', '+919000000002': '222222', '+919000000003': '333333', '+919000000004': '444444' };
 const results = []; const ok = (n, c) => { results.push((c ? 'PASS ' : 'FAIL ') + n); if (!c) process.exitCode = 1; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function codeFor(phone) {

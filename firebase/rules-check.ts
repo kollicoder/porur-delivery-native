@@ -2,7 +2,7 @@
 import { doc, setDoc, updateDoc, getDoc, getDocs, collection, query, where, deleteDoc, writeBatch } from 'firebase/firestore';
 import { signInWithCustomToken } from 'firebase/auth';
 import { FirestoreApi } from '../packages/shared/src/firebase';
-const ADMIN = process.env.ADMIN_PHONE || (require('fs').readFileSync(__dirname + '/.admin-bootstrap.local', 'utf8').match(/BOOTSTRAP_ADMIN_PHONE=(\S+)/) || [])[1] || '+16505550000';
+const ADMIN = process.env.ADMIN_PHONE || (require('fs').readFileSync(__dirname + '/.admin-bootstrap.local', 'utf8').match(/BOOTSTRAP_ADMIN_PHONE=(\S+)/) || [])[1] || '+919000000000';
 let fails = 0;
 const exp = async (name: string, p: Promise<any>, allowed: boolean) => {
   try { await p; console.log((allowed ? 'PASS ' : 'FAIL ') + name + ' (allowed)'); if (!allowed) fails++; }
@@ -22,7 +22,7 @@ async function login(name: string, phone: string) {
 (async () => {
   const anon = new FirestoreApi('anon');
   await exp('signed-out user reads products', getDoc(doc(anon.db, 'products', 'p1')), false);
-  const cust = await login('cust', '+16505550001'); const cu = cust.uid()!;
+  const cust = await login('cust', '+919000000001'); const cu = cust.uid()!;
   await exp('customer reads products', getDoc(doc(cust.db, 'products', 'p1')), true);
   await exp('customer grants self admin role', updateDoc(doc(cust.db, 'users', cu), { role: 'admin' }), false);
   await exp('customer grants self vendor store', updateDoc(doc(cust.db, 'users', cu), { storeId: 's1' }), false);
@@ -56,8 +56,8 @@ async function login(name: string, phone: string) {
   const admin = await login('admin', ADMIN);
   await exp('bootstrap admin (phone in rules) reads all users', getDocs(collection(admin.db, 'users')), true);
   await exp('bootstrap admin edits settings', setDoc(doc(admin.db, 'settings', 'app'), { fee: 25 }, { merge: true }), true);
-  const ven = await login('ven', '+16505550002'); const vu = ven.uid()!;
-  const rid = await login('rid', '+16505550004'); const ru = rid.uid()!;
+  const ven = await login('ven', '+919000000002'); const vu = ven.uid()!;
+  const rid = await login('rid', '+919000000004'); const ru = rid.uid()!;
   await admin.setUserRole(vu, null); await admin.setUserRole(ru, null); // start unapproved
   await new Promise(r => setTimeout(r, 300));
   await exp('vendor (not yet approved) edits price', updateDoc(doc(ven.db, 'products', 'p1'), { price: 33 }), false);

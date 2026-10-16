@@ -2,8 +2,8 @@
 const { chromium } = require('/workspace/porur-prototype/node_modules/playwright');
 const env = process.env; const LIVE = !!env.LIVE; const Q = LIVE ? '?test=1' : '';
 const [P, NC, NV, TAG] = [env.PROTO || 'http://localhost:4173/', env.NCUST || 'http://localhost:8081', env.NVEND || 'http://localhost:8082', env.TAG || 'emu'];
-const PH = { admin: '+16505550000', cust: '+16505550001', vend: '+16505550002', rider: '+16505550004' };
-const LIVECODE = { '+16505550000': '000000', '+16505550001': '111111', '+16505550002': '222222', '+16505550004': '444444' };
+const PH = { admin: '+919000000000', cust: '+919000000001', vend: '+919000000002', rider: '+919000000004' };
+const LIVECODE = { '+919000000000': '000000', '+919000000001': '111111', '+919000000002': '222222', '+919000000004': '444444' };
 const results = []; const ok = (n, c, extra = '') => { results.push((c ? 'PASS ' : 'FAIL ') + n + (extra ? ' — ' + extra : '')); if (!c) process.exitCode = 1; };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 let db; if (!LIVE) { process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080'; const { initializeApp } = require('firebase-admin/app'); initializeApp({ projectId: 'demo-porur' }); db = require('firebase-admin/firestore').getFirestore(); }

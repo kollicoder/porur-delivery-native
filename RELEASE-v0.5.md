@@ -36,7 +36,7 @@ Frontend-only release. The Firestore data model, security rules, auth and backen
   - items collapsed to reduce crowding
 
 ## Demo logins (Firebase test numbers)
-- **Customer:** +1 650-555-0001, code 111111
+- **Customer:** +91 90000 00001, code 111111 (was +1 650-555-0001 before 16 Oct 2026)
 - **Vendor s1:** 0002, code 222222
 - **Pharmacy:** 0003, code 333333 (needs approval)
 - **Rider Karthik:** 0004, code 444444

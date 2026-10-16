@@ -14,7 +14,7 @@ async function codeFor(phone) { for (let i = 0; i < 20; i++) { const j = await (
     if (pre) { await p.getByTestId('otp').fill('000001'); await p.getByTestId('verify').click(); await w(1500); await sh(p, pre + '-b-otp-wrong-resend-timer'); }
     await p.getByTestId('otp').fill(await codeFor(phone)); await p.getByTestId('verify').click(); await w(3500); };
   const c = await mk(390, 844);
-  await c.goto(NC); await login(c, '+16505550001', 'c01-login');
+  await c.goto(NC); await login(c, '+919000000001', 'c01-login');
   await c.goto(NC); await w(3000); await sh(c, 'c02-home');
   await c.setViewportSize({ width: 360, height: 640 }); await w(800); await sh(c, 'c02b-home-360x640-above-fold'); await c.setViewportSize({ width: 390, height: 844 });
   await c.goto(NC + '/category/fv'); await w(2500); await c.getByTestId('add-p1').click(); await w(300); await sh(c, 'c03-category-fruits-veg');
@@ -31,8 +31,8 @@ async function codeFor(phone) { for (let i = 0; i < 20; i++) { const j = await (
   await c.goto(NC + '/rider'); await w(2000); await sh(c, 'c09-book-rider', true);
   await c.getByTestId('book').click(); await c.waitForURL(/order\/ER/, { timeout: 20000 }).catch(() => {}); await w(3000); await sh(c, 'c10-tracking-errand', true);
   // store-rejected + cancelled states
-  const uid = (await db.collection('users').where('phone', '==', '+16505550001').get()).docs[0]?.id;
-  const base = { type: 'order', customer: 'Demo', phone: '+16505550001', customerUid: uid, address: 'Porur', lines: [{ productId: 'p1', name: 'Tomato', qty: 2, price: 32 }], subtotal: 64, fee: 25, total: 89, pay: 'COD', paymentStatus: 'due', createdAt: new Date().toISOString() };
+  const uid = (await db.collection('users').where('phone', '==', '+919000000001').get()).docs[0]?.id;
+  const base = { type: 'order', customer: 'Demo', phone: '+919000000001', customerUid: uid, address: 'Porur', lines: [{ productId: 'p1', name: 'Tomato', qty: 2, price: 32 }], subtotal: 64, fee: 25, total: 89, pay: 'COD', paymentStatus: 'due', createdAt: new Date().toISOString() };
   await db.doc('orders/PD9901').set({ ...base, id: 'PD9901', storeId: 's1', status: 'rejected' });
   await db.doc('orders/PD9902').set({ ...base, id: 'PD9902', storeId: 's3', status: 'rejected', rxStatus: 'rejected', lines: [{ productId: 'p16', name: 'Amoxicillin', qty: 1, price: 95, rx: true }] });
   await c.goto(NC + '/order/PD9901'); await w(3000); await sh(c, 'c11-store-rejected');
@@ -46,12 +46,12 @@ async function codeFor(phone) { for (let i = 0; i < 20; i++) { const j = await (
   const c2 = await mk(390, 844); await c2.goto(NC); await w(250); await sh(c2, 'c00-loading-skeleton'); await c2.context().close();
   // vendor
   const v = await mk(390, 844);
-  await v.goto(NV); await login(v, '+16505550002', 'v01-login'); await v.waitForURL(/orders/, { timeout: 20000 }).catch(() => {}); await w(2500); await sh(v, 'v02-orders', true);
+  await v.goto(NV); await login(v, '+919000000002', 'v01-login'); await v.waitForURL(/orders/, { timeout: 20000 }).catch(() => {}); await w(2500); await sh(v, 'v02-orders', true);
   await v.goto(NV + '/catalogue'); await w(2500); await sh(v, 'v03-items');
   await v.goto(NV + '/sales'); await w(2000); await sh(v, 'v04-sales', true);
-  const v2 = await mk(390, 844); await v2.goto(NV); await login(v2, '+16505550003'); await w(2500); await sh(v2, 'v05-partner-access-request', true);
+  const v2 = await mk(390, 844); await v2.goto(NV); await login(v2, '+919000000003'); await w(2500); await sh(v2, 'v05-partner-access-request', true);
   // rider (prototype web)
-  const r = await mk(390, 844); await r.goto(P + '#/rider/home'); await login(r, '+16505550004'); await w(3000);
+  const r = await mk(390, 844); await r.goto(P + '#/rider/home'); await login(r, '+919000000004'); await w(3000);
   if (/Offline/.test(await r.textContent('.rhead').catch(() => ''))) { await r.locator('.rhead .pill').click(); await w(1500); }
   await sh(r, 'r01-on-duty-location-off-blocker', true);
   await r.locator('.rhead .pill').click(); await w(1500); await sh(r, 'r02-offline'); await r.locator('.rhead .pill').click(); await w(1000);
@@ -61,7 +61,7 @@ async function codeFor(phone) { for (let i = 0; i < 20; i++) { const j = await (
   // prototype customer login + home (web)
   const pc = await mk(390, 844); await pc.goto(P + '#/customer/home'); await w(2500); await sh(pc, 'w01-web-login');
   // admin desktop
-  const a = await mk(1440, 900, 1); await a.goto(P + '#/admin-desktop/overview'); await login(a, '+16505550000'); await w(4000); await sh(a, 'a01-admin-overview-breakeven', true);
+  const a = await mk(1440, 900, 1); await a.goto(P + '#/admin-desktop/overview'); await login(a, '+919000000000'); await w(4000); await sh(a, 'a01-admin-overview-breakeven', true);
   await a.goto(P + '#/admin-desktop/reports'); await w(2500); await sh(a, 'a02-admin-reports', true);
   await a.goto(P + '#/admin-desktop/orders'); await w(2500); await sh(a, 'a03-admin-orders');
   for (const id of ['PD9901', 'PD9902', 'PD9903']) await db.doc('orders/' + id).delete();
