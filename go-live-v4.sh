@@ -3,12 +3,12 @@
 set -euo pipefail
 G="-c user.name=kollicoder -c user.email=kollicoder@users.noreply.github.com"; FB=$(npm prefix -g)/bin/firebase
 K=AIzaSyASMmblBvKh9R381485V5GtE9itW3dtSgA; export JAVA_HOME=/opt/android/jdk21 PATH=/opt/android/jdk21/bin:$PATH
-msg=$(curl -s -X POST "https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=$K" -H 'Content-Type: application/json' -d '{"phoneNumber":"+16505550001"}' | python3 -c "import sys,json;print(json.load(sys.stdin).get('error',{}).get('message','OK'))")
+msg=$(curl -s -X POST "https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=$K" -H 'Content-Type: application/json' -d '{"phoneNumber":"+919000000001"}' | python3 -c "import sys,json;print(json.load(sys.stdin).get('error',{}).get('message','OK'))")
 [ "$msg" = OK ] || { echo "Phone sign-in / test numbers not ready on study-vignes ($msg)"; exit 2; }
 export EXPO_PUBLIC_FIREBASE_PROJECT_ID=study-vignes EXPO_PUBLIC_FIREBASE_API_KEY=$K EXPO_PUBLIC_FIREBASE_APP_ID=1:350770556092:web:fca4082f0d1c98e119f4b9 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=study-vignes.firebaseapp.com EXPO_PUBLIC_FIREBASE_EMULATOR_HOST=
 cd /workspace/porur-native
-# 1. rules with TEMPORARY test admin (+16505550000) for the live E2E approvals
-bash firebase/render-rules.sh +16505550000 && (cd firebase && $FB deploy --only firestore:rules --project study-vignes)
+# 1. rules with TEMPORARY test admin (+919000000000) for the live E2E approvals
+bash firebase/render-rules.sh +919000000000 && (cd firebase && $FB deploy --only firestore:rules --project study-vignes)
 # 2. live web builds
 for a in customer vendor; do (cd apps/$a && npx expo export -p web --clear --output-dir dist >/dev/null); done
 (cd /workspace/porur-prototype && npm run build >/dev/null)
