@@ -24,6 +24,6 @@ export default function Settings() {
       <Row testID="set-credits" icon="ℹ️" label={t('About & photo credits', 'பற்றி')} onPress={() => router.push('/credits')} />
     </Card>
     <Button testID="logout" kind="ghost" title={t('Sign out', 'வெளியேறு')} onPress={() => api.logout()} style={{ marginTop: 16 }} />
-    <Text style={[s.muted, { textAlign: 'center', marginTop: 12 }]}>{BRAND.name} · v0.5</Text>
+    <Text style={[s.muted, { textAlign: 'center', marginTop: 12 }]}>{BRAND.name} · v0.6</Text>
   </ScrollView>;
 }

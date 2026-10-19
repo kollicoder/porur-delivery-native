@@ -13,3 +13,4 @@ ui-debug.log
 firebase/firestore.rules
 .firestore.rules.tmp
 **/dist-emu
+firebase/functions/lib/

@@ -7,6 +7,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { STORES, PRODUCTS, RIDERS } from '../packages/shared/src/catalogue';
 import { DEFAULT_SETTINGS } from '../packages/shared/src/pricing';
 import { SEED_ORDERS } from '../packages/shared/src/orders';
+import { v6SeedDocs } from './seed-v6';
 const live = process.argv.includes('--live');
 if (!live) process.env.FIRESTORE_EMULATOR_HOST ||= 'localhost:8080';
 const projectId = live ? process.env.GOOGLE_CLOUD_PROJECT! : 'demo-porur';
@@ -17,6 +18,8 @@ const projectId = live ? process.env.GOOGLE_CLOUD_PROJECT! : 'demo-porur';
   PRODUCTS.forEach(p => b.set(db.doc('products/' + p.id), { ...p, rx: !!p.rx, inStock: true }));
   RIDERS.forEach(r => b.set(db.doc('riders/' + r.id), r));
   b.set(db.doc('settings/app'), DEFAULT_SETTINGS);
+  // v0.6: food store s4 + menu, FSSAI/deal approval on stores, communities, weekly list, open meter, deal settings, demo cook/pro menus
+  for (const [path, data, merge] of v6SeedDocs()) merge ? b.set(db.doc(path), data, { merge: true }) : b.set(db.doc(path), data);
   if (!process.argv.includes('--no-orders')) SEED_ORDERS.forEach(o => b.set(db.doc('orders/' + o.id), JSON.parse(JSON.stringify({ ...o, customerUid: 'seed-' + o.customer, updatedAt: o.createdAt }))));
   await b.commit();
   console.log(`Seeded ${STORES.length} stores, ${PRODUCTS.length} products, ${RIDERS.length} riders, settings${process.argv.includes('--no-orders') ? '' : `, ${SEED_ORDERS.length} orders`} into ${projectId}`);

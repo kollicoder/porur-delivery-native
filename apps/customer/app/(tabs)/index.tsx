@@ -7,6 +7,12 @@ import { K, F, TAP } from '@porur/shared/src/ui/kit';
 import { CartBar, tileColor } from '../../src/ui';
 import { useApp } from '../../src/store';
 
+const MORE = [
+  { id: 'meter', to: '/meter', en: 'Group buy', ta: 'குழு வாங்குதல்', tag: 'Up to 25% off · weekly', emoji: '🧺', bg: K.ink, dark: true },
+  { id: 'deals', to: '/deals', en: "Tonight's deals", ta: 'இன்றைய சலுகை', tag: '9–11 pm · 30%+ off', emoji: '🔥', bg: K.orangeBright },
+  { id: 'lunch', to: '/lunch', en: 'Office lunch', ta: 'அலுவலக சாப்பாடு', tag: '₹130–150 · 5+ packs', emoji: '🍱', bg: K.yellow },
+  { id: 'services', to: '/services', en: 'Home services', ta: 'வீட்டு சேவை', tag: 'Verified · ₹149 visit', emoji: '🛠️', bg: K.blueSoft },
+];
 export default function Home() {
   const { t, settings } = useApp();
   return <SafeAreaView style={{ flex: 1, backgroundColor: K.bg }} edges={['top']}><ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 170 }}>
@@ -41,6 +47,18 @@ export default function Home() {
     <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
       <View style={{ flex: 1, backgroundColor: K.green, borderRadius: 22, padding: 14 }}><Text style={{ fontFamily: F.display, color: '#fff', fontSize: 16 }}>Free delivery above ₹{settings.free}</Text><Text style={{ fontFamily: F.body, color: '#fff', fontSize: 12, marginTop: 4 }}>Applied at checkout</Text></View>
       <View style={{ flex: 1, backgroundColor: K.lilac, borderRadius: 22, padding: 14 }}><Text style={{ fontFamily: F.display, color: K.ink, fontSize: 16 }}>Medicines all night</Text><Text style={{ fontFamily: F.body, color: K.ink2, fontSize: 12, marginTop: 4 }}>24×7 pharmacy tie-up</Text></View>
+    </View>
+    {/* v0.6 — More ways to save: one compact 2×2 block, so the new models are discoverable without crowding the core shop flow */}
+    <Text testID="more-ways" style={{ fontFamily: F.display, fontSize: 20, color: K.ink, marginTop: 18 }}>{t('More ways to save', 'மேலும் சேமிக்க')}</Text>
+    <Text style={{ fontFamily: F.ta, fontSize: 12, color: K.muted, marginBottom: 10 }}>{t('Group buys, office lunch, home services & tonight\'s deals', 'குழு வாங்குதல் · அலுவலக சாப்பாடு · வீட்டு சேவை · இன்றைய சலுகை')}</Text>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 }}>
+      {MORE.map(m => <Pressable key={m.id} testID={'more-' + m.id} accessibilityLabel={m.en} onPress={() => router.push(m.to as any)}
+        style={{ width: '48.5%', minHeight: 108, backgroundColor: m.bg, borderRadius: 22, padding: 12, overflow: 'hidden' }}>
+        <Text style={{ fontFamily: F.bold, fontSize: 11, color: m.dark ? K.yellow : K.ink2 }}>{m.tag}</Text>
+        <Text style={{ fontFamily: F.display, fontSize: 17, color: m.dark ? '#fff' : K.ink, marginTop: 2, maxWidth: '78%' }}>{m.en}</Text>
+        <Text style={{ fontFamily: F.ta, fontSize: 11, color: m.dark ? '#E9E4D8' : K.ink2 }}>{m.ta}</Text>
+        <Text style={{ position: 'absolute', right: 8, bottom: 4, fontSize: 34 }}>{m.emoji}</Text>
+      </Pressable>)}
     </View>
     <Text style={{ fontFamily: F.display, fontSize: 20, color: K.ink, marginTop: 18, marginBottom: 6 }}>{t('Stores near you', 'அருகிலுள்ள கடைகள்')}</Text>
     {STORES.map(st => <Pressable key={st.id} onPress={() => router.push(`/category/${st.cat}`)} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', backgroundColor: K.card, borderRadius: 20, padding: 12, marginVertical: 5, borderWidth: 1, borderColor: K.line, minHeight: 64 }}>
