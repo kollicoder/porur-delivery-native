@@ -11,6 +11,7 @@ const env = (k: string, d = '') => {
   const m: Record<string, string | undefined> = {
     BACKEND: process.env.EXPO_PUBLIC_BACKEND, PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID, API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
     APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID, AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN, EMULATOR_HOST: process.env.EXPO_PUBLIC_FIREBASE_EMULATOR_HOST,
+    FS_PORT: process.env.EXPO_PUBLIC_FIRESTORE_EMULATOR_PORT,
   };
   const v = m[k]; return v === undefined ? d : v;
 };
@@ -20,4 +21,6 @@ export const backendConfig = {
   firebase: { projectId, apiKey: env('API_KEY', 'demo-api-key'), appId: env('APP_ID', '1:000:web:demo'), authDomain: env('AUTH_DOMAIN', `${projectId}.firebaseapp.com`) },
   // demo-* projects always use the emulator
   emulatorHost: env('EMULATOR_HOST', projectId.startsWith('demo-') ? 'localhost' : ''),
+  /** Firestore emulator port (default 8080; set EXPO_PUBLIC_FIRESTORE_EMULATOR_PORT when 8080 is taken) */
+  emulatorFsPort: Number(env('FS_PORT', '8080')),
 };

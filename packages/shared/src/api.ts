@@ -9,10 +9,10 @@ import { Order, OrderStatus, SEED_ORDERS, LiveProduct } from './orders';
 import { PRODUCTS, RIDERS, Rider } from './catalogue';
 import { Settings, DEFAULT_SETTINGS } from './pricing';
 
-export type Role = 'customer' | 'vendor' | 'rider' | 'admin';
-export interface AccessRequest { role: 'vendor' | 'rider'; storeId?: string; riderId?: string; note?: string; at: string }
+export type Role = 'customer' | 'vendor' | 'rider' | 'admin' | 'cook' | 'pro' | 'leader';
+export interface AccessRequest { role: 'vendor' | 'rider' | 'cook' | 'pro'; storeId?: string; riderId?: string; note?: string; at: string }
 /** users/{uid}. `role` is set ONLY by an admin (rules enforce); no role = customer. */
-export interface UserProfile { uid: string; phone: string; name?: string; role?: Role; storeId?: string; riderId?: string; request?: AccessRequest; pushToken?: string; createdAt?: string }
+export interface UserProfile { uid: string; phone: string; name?: string; role?: Role; storeId?: string; riderId?: string; cookId?: string; proId?: string; communityId?: string; flat?: string; office?: { company: string; gstin?: string; officeId: string; floor?: string }; request?: AccessRequest; pushToken?: string; createdAt?: string }
 export interface ProductOverride { price?: number; inStock?: boolean }
 export interface OrderFilter { storeId?: string; customerUid?: string; rider?: string }
 export type Unsub = () => void;

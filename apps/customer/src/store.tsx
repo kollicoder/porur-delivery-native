@@ -4,6 +4,7 @@ import type { User } from 'firebase/auth';
 import { Cart, Order, getApi, LiveProduct, PRODUCTS, Settings, DEFAULT_SETTINGS, Rider, RIDERS, UserProfile } from '@porur/shared';
 import type { FirestoreApi } from '@porur/shared/src/firebase';
 import { setupNotifications, localNotify, STATUS_TEXT } from '@porur/shared/src/ui/notify';
+import { shouldPush, Deal, DealPrefs } from '@porur/shared';
 
 export const api = getApi([]) as FirestoreApi;
 export const ME = { customer: 'Customer', phone: '' };
@@ -24,10 +25,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => api.onAuth(setUser), []);
   useEffect(() => {
     if (!user) return;
-    const subs = [api.watchProducts(p => { setProductsReady(true); if (p.length) setProducts(p); }), api.watchSettings(setSettings), api.watchRiders(r => r.length && setRiders(r)),
+    const subs = [api.watchProducts(p => { setProductsReady(true); if (p.length) setProducts(p.filter(x => (x.cat as string) !== 'food')); /* v0.6: food items only appear as flash deals */ }), api.watchSettings(setSettings), api.watchRiders(r => r.length && setRiders(r)),
       api.watchOrders({ customerUid: 'me' }, o => { setOrders(o); setOrdersReady(true); }), api.watchMe(setMe)];
     setupNotifications().then(r => { if (r.pushToken) { setPushToken(r.pushToken); api.updateMe({ pushToken: r.pushToken }).catch(() => {}); api.registerPushToken(r.pushToken).catch(() => {}); } }).catch(() => {});
     return () => subs.forEach(f => f());
+  }, [user]);
+  // v0.6: in-app deal alert while the app is open (same rules as the server push: opted in, within radius, veg pref, once a day, quiet after 10:30 pm)
+  useEffect(() => {
+    if (!user) return; let prefs: DealPrefs | null = null; const seenD = new Set<string>(); let first = true;
+    const a = api.models.watchPrefs(p => { prefs = p; });
+    const b = api.models.watchLiveDeals((ds: Deal[]) => { const fresh = ds.filter(d => !seenD.has(d.id)); ds.forEach(d => seenD.add(d.id)); if (first) { first = false; return; }
+      const d = fresh.find(x => prefs && !shouldPush(prefs, x)); if (!d || !prefs) return;
+      localNotify(`🔥 ${d.discountPct}% off ${d.item}`, `${d.storeName} · ₹${d.dealPrice} · only ${d.qtyLeft} left`); });
+    return () => { a(); b(); };
   }, [user]);
   // Local notification when one of my orders changes status
   const seen = useRef<Record<string, string> | null>(null);
@@ -37,6 +47,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [orders.map(o => o.id + o.status).join()]);
   const setQty = (id: string, q: number) => setCart(c => { const x = { ...c }; if (q <= 0) delete x[id]; else x[id] = Math.round(q * 2) / 2; return x; });
   const addMany = (m: Record<string, number>) => setCart(c => { const x = { ...c }; for (const k in m) x[k] = (x[k] || 0) + m[k]; return x; });
+  useEffect(() => { (api as any)._name = me?.name || user?.phoneNumber || 'Customer'; }, [me?.name, user?.phoneNumber]);
   const who = { customer: me?.name || user?.phoneNumber || 'Customer', phone: user?.phoneNumber || '' };
   return <Ctx.Provider value={{ cart, setQty, addMany, clear: () => setCart({}), orders, refresh: async () => {}, products, settings, uid: user?.uid, user, me, riders, pushToken, who, ordersReady, productsReady, lang, setLang: (l: Lang) => { setLangS(l); AsyncStorage.setItem('porur.lang', l); }, t: (en: string, ta: string) => lang === 'ta' ? ta : en }}>{children}</Ctx.Provider>;
 }

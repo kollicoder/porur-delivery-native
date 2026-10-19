@@ -10,6 +10,7 @@ import { pickRider } from './dispatch';
 import { sendPushMany } from './push';
 import type { Rider } from './catalogue';
 import { DEFAULT_SETTINGS, Settings } from './pricing';
+import { ModelsApi } from './modelsApi';
 
 /** Firestore removes `undefined` poorly — strip it. */
 const clean = <T extends object>(o: T): T => JSON.parse(JSON.stringify(o));
@@ -39,7 +40,7 @@ export class FirestoreApi implements PorurApi {
     const h = backendConfig.emulatorHost; this.emulator = !!h;
     this.resetReady();
     if (h) {
-      connectAuthEmulator(this.auth, `http://${h}:9099`, { disableWarnings: true }); connectFirestoreEmulator(this.db, h, 8080);
+      connectAuthEmulator(this.auth, `http://${h}:9099`, { disableWarnings: true }); connectFirestoreEmulator(this.db, h, backendConfig.emulatorFsPort);
       this.auth.settings.appVerificationDisabledForTesting = true; // emulator: no reCAPTCHA
     }
     // Web export: ?test=1 enables Firebase *test phone numbers* without reCAPTCHA (real numbers still require it).
@@ -69,7 +70,7 @@ export class FirestoreApi implements PorurApi {
   watchMe(cb: (p: UserProfile | null) => void): Unsub {
     return this.defer(() => onSnapshot(doc(this.db, 'users', this._uid!), s => cb(s.exists() ? ({ uid: s.id, ...s.data() } as UserProfile) : null), e => console.warn('me', e)));
   }
-  async updateMe(patch: { name?: string; pushToken?: string; request?: AccessRequest | null }) {
+  async updateMe(patch: { name?: string; pushToken?: string; request?: AccessRequest | null; flat?: string; office?: any }) {
     await this.ready;
     const p: any = { ...patch, updatedAt: new Date().toISOString() };
     if (patch.request === null) p.request = deleteField();
@@ -79,10 +80,15 @@ export class FirestoreApi implements PorurApi {
   watchUsers(cb: (u: UserProfile[]) => void): Unsub {
     return this.defer(() => onSnapshot(collection(this.db, 'users'), s => cb(s.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile))), e => console.warn('users', e)));
   }
-  async setUserRole(uid: string, role: Role | null, extra: { storeId?: string; riderId?: string } = {}) {
+  async setUserRole(uid: string, role: Role | null, extra: { storeId?: string; riderId?: string; cookId?: string; proId?: string; communityId?: string } = {}) {
     await this.ready;
-    return updateDoc(doc(this.db, 'users', uid), { role: role ?? deleteField(), storeId: extra.storeId ?? deleteField(), riderId: extra.riderId ?? deleteField(), request: deleteField(), updatedAt: new Date().toISOString() });
+    return updateDoc(doc(this.db, 'users', uid), { role: role ?? deleteField(), storeId: extra.storeId ?? deleteField(), riderId: extra.riderId ?? deleteField(),
+      cookId: extra.cookId ?? deleteField(), proId: extra.proId ?? deleteField(), communityId: extra.communityId ?? deleteField(), request: deleteField(), updatedAt: new Date().toISOString() });
   }
+  /** v0.6 models (meter, lunch, services, deals) on the same Firestore + signed-in user. */
+  private _models?: ModelsApi;
+  get models() { return this._models ||= new ModelsApi(this.db, () => this._uid ? { uid: this._uid, phone: this.auth.currentUser?.phoneNumber || '', name: this._name || this.auth.currentUser?.phoneNumber || 'Customer' } : undefined); }
+  _name?: string;
 
   /** Rules require sign-in, so listeners attach only after sign-in. */
   private defer(start: () => Unsub): Unsub {

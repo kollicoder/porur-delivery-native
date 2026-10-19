@@ -21,6 +21,12 @@ export default function Root() {
       <Stack.Screen name="rider" options={{ title: 'Book a rider' }} />
       <Stack.Screen name="settings" options={{ title: 'Profile & settings' }} />
       <Stack.Screen name="credits" options={{ title: 'About & credits' }} />
+      <Stack.Screen name="meter" options={{ title: 'Group buy' }} />
+      <Stack.Screen name="leader" options={{ title: 'Leader dashboard' }} />
+      <Stack.Screen name="lunch" options={{ title: 'Office lunch' }} />
+      <Stack.Screen name="services" options={{ title: 'Home services' }} />
+      <Stack.Screen name="job/[id]" options={{ title: 'Your booking' }} />
+      <Stack.Screen name="deals" options={{ title: "Tonight's deals" }} />
     </Stack></Gate></AppProvider>;
 }
 function Gate({ children }: { children: React.ReactNode }) {

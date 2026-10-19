@@ -1,5 +1,6 @@
 rules_version = '2';
-// Porur Delivery — Firestore rules (v0.4: private delivery OTP, rider auto-dispatch, pay-on-delivery, private prescriptions, push tokens).
+// Porur Delivery — Firestore rules (v0.4: private delivery OTP, rider auto-dispatch, pay-on-delivery, private prescriptions, push tokens;
+// v0.6: group-buy meter, office lunch + home cooks, home-services pros, surplus flash deals, batched drops).
 // __ADMIN_PHONES__ is replaced at deploy time from firebase/.admin-bootstrap.local (never committed).
 service cloud.firestore {
   match /databases/{db}/documents {
@@ -17,15 +18,27 @@ service cloud.firestore {
     function riderAvailable(r) { return exists(/databases/$(db)/documents/riders/$(r))
                                   && get(/databases/$(db)/documents/riders/$(r)).data.status in ['online', 'delivering']; }
     function secret(id) { return get(/databases/$(db)/documents/orderSecrets/$(id)).data; }
+    // ---------- v0.6 helpers ----------
+    function myRole() { return signedIn() && hasProfile() ? me().get('role', '') : ''; }
+    function isCookId(id) { return myRole() == 'cook' && me().get('cookId', '') == id; }
+    function isProId(id) { return myRole() == 'pro' && me().get('proId', '') == id; }
+    function isLeaderOf(c) { return myRole() == 'leader' && me().get('communityId', '') == c; }
+    function nowMs() { return request.time.toMillis(); }
+    function istDay() { return int((request.time.toMillis() + 19800000) / 86400000); }
+    function istHour() { return float((request.time.toMillis() + 19800000) % 86400000) / 3600000.0; }
+    function doc_(c, id) { return /databases/$(db)/documents/$(c)/$(id); }
+    function payOk(d) { return d.get('pay', 'COD') in ['COD', 'UPI_DOD'] && d.get('paymentStatus', 'due') == 'due'; }
+    function dealsCfg() { return get(/databases/$(db)/documents/settings/deals).data; }
+    function priceOk(p) { return p is number && p >= 130 && p <= 150; }
 
     match /users/{uid} {
       allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
       // Users create/edit their own profile and may file an access *request*, but can never grant themselves a role.
       allow create: if (signedIn() && request.auth.uid == uid
-                        && !request.resource.data.keys().hasAny(['role', 'storeId', 'riderId'])
+                        && !request.resource.data.keys().hasAny(['role', 'storeId', 'riderId', 'cookId', 'proId', 'communityId'])
                         && request.resource.data.get('phone', '') == request.auth.token.phone_number)
                     || isAdmin();
-      allow update: if (signedIn() && request.auth.uid == uid && !changes().hasAny(['role', 'storeId', 'riderId', 'phone'])) || isAdmin();
+      allow update: if (signedIn() && request.auth.uid == uid && !changes().hasAny(['role', 'storeId', 'riderId', 'cookId', 'proId', 'communityId', 'phone'])) || isAdmin();
       allow delete: if isAdmin();
     }
     match /settings/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
@@ -101,5 +114,311 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid;
       allow update, delete: if isAdmin();
     }
+    // =====================================================================================================
+    // v0.6 — 1. GROUP-BUY METER (fill or Sunday). Baskets are pay-on-delivery commitments at the Sunday price.
+    match /communities/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /weeklyLists/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /supplierPOs/{id} { allow read, write: if isAdmin(); }
+    match /meters/{id} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      // A customer may only move the counter by exactly +1 together with creating their own new basket (same transaction),
+      // or by -1 together with cancelling their own still-committed basket — and only while the meter is open and before the cutoff.
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.status == 'open' && nowMs() < resource.data.cutoffMs
+            && onlyChanges(['count', 'lastOrderId', 'updatedAt'])
+            && request.resource.data.count == resource.data.count + 1
+            && !exists(doc_('meterOrders', request.resource.data.lastOrderId))
+            && getAfter(doc_('meterOrders', request.resource.data.lastOrderId)).data.meterId == id
+            && getAfter(doc_('meterOrders', request.resource.data.lastOrderId)).data.customerUid == request.auth.uid)
+        || (signedIn() && resource.data.status == 'open'
+            && onlyChanges(['count', 'lastCancelId', 'updatedAt'])
+            && request.resource.data.count == resource.data.count - 1
+            && get(doc_('meterOrders', request.resource.data.lastCancelId)).data.status == 'committed'
+            && get(doc_('meterOrders', request.resource.data.lastCancelId)).data.meterId == id
+            && get(doc_('meterOrders', request.resource.data.lastCancelId)).data.customerUid == request.auth.uid
+            && getAfter(doc_('meterOrders', request.resource.data.lastCancelId)).data.status == 'cancelled');
+    }
+    function basketOk(d, id) {
+      let m = get(doc_('meters', d.meterId)).data;
+      return d.customerUid == request.auth.uid && d.id == id && d.status == 'committed'
+        && d.sundayTotal is number && d.sundayTotal >= 300 && d.prepaidAmount == d.sundayTotal && d.fillTotal <= d.sundayTotal
+        && d.lines is list && d.lines.size() > 0 && d.lines.size() <= 50 && payOk(d)
+        && !d.keys().hasAny(['finalTier', 'finalAmount', 'refundDue', 'refundStatus', 'walletApplied', 'amountDue', 'handoverStatus', 'dropId', 'collectedVia'])
+        && m.status == 'open' && nowMs() < m.cutoffMs && d.cycleId == m.cycleId
+        && exists(doc_('communities', d.communityId))
+        && getAfter(doc_('meters', d.meterId)).data.count == m.count + 1
+        && getAfter(doc_('meters', d.meterId)).data.lastOrderId == id;
+    }
+    match /meterOrders/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid) || isLeaderOf(resource.data.communityId);
+      allow create: if signedIn() && basketOk(request.resource.data, id);
+      allow update: if isAdmin()
+        // customer cancels free of charge until the batch closes (meter counter -1 in the same transaction)
+        || (signedIn() && resource.data.customerUid == request.auth.uid && resource.data.status == 'committed'
+            && onlyChanges(['status', 'cancelledAt', 'updatedAt']) && request.resource.data.status == 'cancelled'
+            && getAfter(doc_('meters', resource.data.meterId)).data.lastCancelId == id
+            && getAfter(doc_('meters', resource.data.meterId)).data.count == get(doc_('meters', resource.data.meterId)).data.count - 1)
+        // community leader: gate handover only (who collected, cash/UPI), after the batch closed
+        || (isLeaderOf(resource.data.communityId) && resource.data.status == 'locked'
+            && onlyChanges(['handoverStatus', 'collectedVia', 'handedAt', 'updatedAt'])
+            && request.resource.data.handoverStatus in ['handed', 'missed']);
+      allow delete: if isAdmin();
+    }
+    // Wallet ledger (refund-of-difference / line refunds). Only the admin (or later a server) writes credits.
+    match /walletLedger/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow write: if isAdmin();
+    }
+    // Batched rider tasks: gate drops (meter), lunch runs (office), with ONE drop OTP held by the leader / office orderer.
+    match /drops/{id} {
+      allow read: if isAdmin() || isRiderId(resource.data.get('riderId', '')) || (signedIn() && request.auth.uid in resource.data.uids)
+        || isLeaderOf(resource.data.get('communityId', ''));
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (isRiderId(resource.data.get('riderId', '')) && resource.data.status != 'delivered'
+            && onlyChanges(['status', 'dropCode', 'deliveredAt', 'updatedAt'])
+            && ((request.resource.data.status == 'picked_up' && !changes().hasAny(['dropCode', 'deliveredAt']))
+                || (request.resource.data.status == 'delivered'
+                    && request.resource.data.get('dropCode', '') == get(doc_('dropSecrets', id)).data.code)));
+    }
+    match /dropSecrets/{id} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid in resource.data.uids) || isLeaderOf(resource.data.get('communityId', ''));
+      allow write: if isAdmin();
+    }
+
+    // =====================================================================================================
+    // v0.6 — 2. OFFICE LUNCH (home cooks, ≥5 packs, ₹130–150, evening-before cutoff)
+    match /cooks/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /cookApplications/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if isAdmin() || (signedIn() && request.auth.uid == uid && request.resource.data.status == 'pending'
+        && (resource == null || resource.data.status != 'approved')
+        && request.resource.data.uid == uid
+        && request.resource.data.fssaiNo is string && request.resource.data.fssaiNo.matches('^[0-9]{14}$'));
+      allow delete: if isAdmin();
+    }
+    match /mealMenus/{id} {
+      allow read: if signedIn();
+      allow create: if isAdmin() || (isCookId(request.resource.data.cookId)
+        && id == request.resource.data.date + '_' + request.resource.data.cookId
+        && get(doc_('cooks', request.resource.data.cookId)).data.status == 'active'
+        && priceOk(request.resource.data.vegPrice) && (!request.resource.data.keys().hasAny(['nonVegPrice']) || priceOk(request.resource.data.nonVegPrice))
+        && request.resource.data.booked == 0 && request.resource.data.checklistDone == false
+        && request.resource.data.capacity is int && request.resource.data.capacity >= 1 && request.resource.data.capacity <= 200
+        && request.resource.data.cutoffMs is int);
+      allow update: if isAdmin()
+        || (isCookId(resource.data.cookId)
+            && onlyChanges(['vegDish', 'vegPrice', 'nonVegDish', 'nonVegPrice', 'capacity', 'checklist', 'checklistDone', 'updatedAt'])
+            && priceOk(request.resource.data.vegPrice) && (!request.resource.data.keys().hasAny(['nonVegPrice']) || priceOk(request.resource.data.nonVegPrice))
+            && request.resource.data.capacity >= resource.data.booked)
+        // a customer books packs: +packs of their new order (same transaction), never above capacity, before the cutoff
+        || (signedIn() && nowMs() < resource.data.cutoffMs && onlyChanges(['booked', 'lastOrderId', 'updatedAt'])
+            && !exists(doc_('lunchOrders', request.resource.data.lastOrderId))
+            && getAfter(doc_('lunchOrders', request.resource.data.lastOrderId)).data.menuId == id
+            && getAfter(doc_('lunchOrders', request.resource.data.lastOrderId)).data.customerUid == request.auth.uid
+            && request.resource.data.booked == resource.data.booked + getAfter(doc_('lunchOrders', request.resource.data.lastOrderId)).data.packs
+            && request.resource.data.booked <= resource.data.capacity);
+      allow delete: if isAdmin();
+    }
+    function lunchOk(d, id) {
+      let m = get(doc_('mealMenus', d.menuId)).data;
+      return d.customerUid == request.auth.uid && d.id == id && d.status == 'placed'
+        && d.vegPacks is int && d.nonVegPacks is int && d.vegPacks >= 0 && d.nonVegPacks >= 0
+        && d.packs == d.vegPacks + d.nonVegPacks && d.packs >= 5
+        && d.vegPrice == m.vegPrice && d.nonVegPrice == m.get('nonVegPrice', 0) && (d.nonVegPacks == 0 || m.get('nonVegPrice', 0) > 0)
+        && d.total == d.vegPacks * d.vegPrice + d.nonVegPacks * d.nonVegPrice
+        && d.cookId == m.cookId && d.date == m.date && nowMs() < m.cutoffMs
+        && d.company is string && d.company.size() > 1 && d.office is string && d.office.size() > 3
+        && payOk(d) && !d.keys().hasAny(['dropId'])
+        && get(doc_('cooks', m.cookId)).data.status == 'active'
+        && getAfter(doc_('mealMenus', d.menuId)).data.lastOrderId == id;
+    }
+    match /lunchOrders/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid) || isCookId(resource.data.get('cookId', ''));
+      allow create: if signedIn() && lunchOk(request.resource.data, id);
+      allow update: if isAdmin()
+        // cook: confirm → cooking → ready; "ready" only after today's hygiene checklist is complete
+        || (isCookId(resource.data.cookId) && onlyChanges(['status', 'updatedAt'])
+            && ((resource.data.status == 'placed' && request.resource.data.status == 'confirmed')
+                || (resource.data.status == 'confirmed' && request.resource.data.status == 'cooking')
+                || (resource.data.status in ['confirmed', 'cooking'] && request.resource.data.status == 'ready'
+                    && get(doc_('mealMenus', resource.data.menuId)).data.get('checklistDone', false) == true)));
+      allow delete: if isAdmin();
+    }
+
+    // =====================================================================================================
+    // v0.6 — 3. HOME SERVICES (pros: plumber, electrician petty repairs, appliance repair, deep cleaning)
+    match /pros/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+    match /proApplications/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      // KYC: only the LAST 4 digits of the ID are stored (never a full Aadhaar number)
+      allow create, update: if isAdmin() || (signedIn() && request.auth.uid == uid && request.resource.data.status == 'pending'
+        && (resource == null || resource.data.status != 'approved') && request.resource.data.uid == uid
+        && request.resource.data.idLast4 is string && request.resource.data.idLast4.matches('^[0-9]{4}$')
+        && request.resource.data.skills is list && request.resource.data.skills.size() > 0
+        && request.resource.data.skills.hasOnly(['plumber', 'electrician', 'appliance', 'deepclean'])
+        && !request.resource.data.keys().hasAny(['aadhaar', 'idNumber']));
+      allow delete: if isAdmin();
+    }
+    // One doc per pro per 2-hour slot (create-only) = no double booking.
+    match /proSlots/{id} {
+      allow read: if signedIn();
+      allow create: if isAdmin() || (signedIn() && request.resource.data.customerUid == request.auth.uid
+        && getAfter(doc_('jobs', request.resource.data.jobId)).data.customerUid == request.auth.uid
+        && getAfter(doc_('jobs', request.resource.data.jobId)).data.proId == request.resource.data.proId
+        && id == request.resource.data.proId + '_' + getAfter(doc_('jobs', request.resource.data.jobId)).data.slotDate + '_' + getAfter(doc_('jobs', request.resource.data.jobId)).data.slot);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || isProId(resource.data.proId);
+    }
+    function jobSecret(id) { return get(doc_('jobSecrets', id)).data; }
+    function jobOk(d, id) {
+      return d.customerUid == request.auth.uid && d.id == id && payOk(d)
+        && d.serviceId in ['plumber', 'electrician', 'appliance', 'deepclean']
+        && d.slot in ['08', '10', '12', '14', '16', '18'] && d.slotStartMs is int && d.slotStartMs > nowMs() - 7200000
+        && !d.keys().hasAny(['startCode', 'finishCode', 'quoteLines', 'quoteTotal', 'rating', 'warrantyUntilMs', 'doneAt'])
+        && existsAfter(doc_('jobSecrets', id))
+        && (d.keys().hasAny(['warrantyOf'])
+              // warranty re-do: free, same pro, original job is mine, done and still within 30 days
+              ? (d.inspectionFee == 0 && get(doc_('jobs', d.warrantyOf)).data.customerUid == request.auth.uid
+                 && get(doc_('jobs', d.warrantyOf)).data.status == 'done' && nowMs() < get(doc_('jobs', d.warrantyOf)).data.warrantyUntilMs
+                 && d.get('proId', '') == get(doc_('jobs', d.warrantyOf)).data.proId)
+              : d.inspectionFee == 149)
+        && (d.keys().hasAny(['proId'])
+              ? (d.status == 'assigned' && get(doc_('pros', d.proId)).data.status == 'active'
+                 && d.serviceId in get(doc_('pros', d.proId)).data.skills
+                 && getAfter(doc_('proSlots', d.proId + '_' + d.slotDate + '_' + d.slot)).data.jobId == id)
+              : d.status == 'requested');
+    }
+    match /jobs/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid) || isProId(resource.data.get('proId', ''));
+      allow create: if signedIn() && jobOk(request.resource.data, id);
+      allow update: if isAdmin()
+        || (isProId(resource.data.get('proId', '')) && (
+              (resource.data.status == 'assigned' && request.resource.data.status == 'en_route' && onlyChanges(['status', 'updatedAt']))
+           || (resource.data.status in ['assigned', 'en_route'] && request.resource.data.status == 'started'
+                && onlyChanges(['status', 'startCode', 'startedAt', 'updatedAt']) && request.resource.data.startCode == jobSecret(id).startOtp)
+           || (resource.data.status == 'started' && request.resource.data.status == 'quoted'
+                && onlyChanges(['status', 'quoteLines', 'quoteTotal', 'updatedAt'])
+                && request.resource.data.quoteLines is list && request.resource.data.quoteLines.size() <= 10
+                && request.resource.data.quoteTotal is number && request.resource.data.quoteTotal >= 0)
+           || (resource.data.status in ['started', 'quote_approved', 'quote_declined'] && request.resource.data.status == 'done'
+                && onlyChanges(['status', 'finishCode', 'doneAt', 'warrantyUntil', 'warrantyUntilMs', 'paymentStatus', 'collectedVia', 'updatedAt'])
+                && request.resource.data.finishCode == jobSecret(id).finishOtp
+                && request.resource.data.warrantyUntilMs <= nowMs() + 2678400000)))
+        || (signedIn() && resource.data.customerUid == request.auth.uid && (
+              (resource.data.status == 'quoted' && request.resource.data.status in ['quote_approved', 'quote_declined'] && onlyChanges(['status', 'updatedAt']))
+           || (resource.data.status in ['requested', 'assigned'] && request.resource.data.status == 'cancelled' && onlyChanges(['status', 'updatedAt']))
+           || (resource.data.status == 'done' && !resource.data.keys().hasAny(['rating']) && onlyChanges(['rating', 'review', 'ratedAt', 'updatedAt'])
+                && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5)));
+      allow delete: if isAdmin();
+    }
+    // Start / finish OTPs: only the customer (and admin) can read them; the pro types what the customer reads out.
+    match /jobSecrets/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
+      allow create: if isAdmin() || (signedIn() && request.resource.data.customerUid == request.auth.uid
+        && request.resource.data.startOtp.matches('^[0-9]{4}$') && request.resource.data.finishOtp.matches('^[0-9]{4}$')
+        && getAfter(doc_('jobs', id)).data.customerUid == request.auth.uid && !exists(doc_('jobs', id)));
+      allow update, delete: if isAdmin();
+    }
+
+    // =====================================================================================================
+    // v0.6 — 4. SURPLUS FLASH DEALS (FSSAI vendors; ≥30% off; 60–90 min; 2 deals / 20 portions per vendor per night)
+    function dealOk(d, id) {
+      let st = get(doc_('stores', d.storeId)).data;
+      let p = get(doc_('products', d.productId)).data;
+      let cfg = dealsCfg();
+      let cap = doc_('dealCaps', d.storeId + '_' + string(istDay()));
+      return isVendorOf(d.storeId) && d.id == id && d.status == 'live' && d.confirmedAt is string
+        && cfg.get('killAll', false) == false
+        && (cfg.get('anyTime', false) == true || (istHour() >= cfg.get('fromHour', 21) && istHour() < cfg.get('toHour', 23)))
+        && st.get('fssaiNo', '') != '' && st.get('dealsApproved', false) == true && st.get('dealsPaused', false) == false
+        && p.store == d.storeId && d.regularPrice == p.price && d.dealPrice is number && d.dealPrice > 0 && d.dealPrice <= p.price * 0.7
+        && d.qtyTotal is int && d.qtyTotal >= 1 && d.qtyTotal <= 20 && d.qtyLeft == d.qtyTotal
+        && d.windowStartMs > nowMs() - 300000 && d.windowStartMs < nowMs() + 300000
+        && d.expiresAtMs - d.windowStartMs >= 3600000 && d.expiresAtMs - d.windowStartMs <= 5400000
+        && d.dayNo == istDay() && d.deliveryFee == 39 && d.fulfil in ['pickup', 'both']
+        && getAfter(cap).data.lastDealId == id && getAfter(cap).data.deals <= 2 && getAfter(cap).data.units <= 20;
+    }
+    match /deals/{id} {
+      allow read: if signedIn();
+      allow create: if dealOk(request.resource.data, id);
+      allow update: if isAdmin()
+        || (isVendorOf(resource.data.storeId) && onlyChanges(['status', 'removedReason', 'updatedAt']) && request.resource.data.status == 'removed')
+        // first come, first served claim: qtyLeft − qty of the NEW claim created in the same transaction
+        || (signedIn() && resource.data.status == 'live' && nowMs() < resource.data.expiresAtMs
+            && onlyChanges(['qtyLeft', 'status', 'lastClaimId', 'updatedAt'])
+            && !exists(doc_('dealClaims', request.resource.data.lastClaimId))
+            && getAfter(doc_('dealClaims', request.resource.data.lastClaimId)).data.dealId == id
+            && getAfter(doc_('dealClaims', request.resource.data.lastClaimId)).data.customerUid == request.auth.uid
+            && request.resource.data.qtyLeft == resource.data.qtyLeft - getAfter(doc_('dealClaims', request.resource.data.lastClaimId)).data.qty
+            && request.resource.data.qtyLeft >= 0
+            && request.resource.data.status == (request.resource.data.qtyLeft == 0 ? 'soldOut' : 'live'));
+      allow delete: if isAdmin();
+    }
+    // Per-vendor per-night counters (id = storeId_istDayNo). Moves only together with a new deal of that store.
+    match /dealCaps/{cid} {
+      allow read: if isAdmin() || (signedIn() && (resource == null || isVendorOf(resource.data.storeId)));
+      allow create: if isVendorOf(request.resource.data.storeId) && cid == request.resource.data.storeId + '_' + string(istDay())
+        && request.resource.data.dayNo == istDay() && request.resource.data.deals == 1
+        && !exists(doc_('deals', request.resource.data.lastDealId))
+        && getAfter(doc_('deals', request.resource.data.lastDealId)).data.storeId == request.resource.data.storeId
+        && request.resource.data.units == getAfter(doc_('deals', request.resource.data.lastDealId)).data.qtyTotal;
+      allow update: if isVendorOf(resource.data.storeId) && onlyChanges(['deals', 'units', 'lastDealId'])
+        && request.resource.data.deals == resource.data.deals + 1
+        && !exists(doc_('deals', request.resource.data.lastDealId))
+        && getAfter(doc_('deals', request.resource.data.lastDealId)).data.storeId == resource.data.storeId
+        && request.resource.data.units == resource.data.units + getAfter(doc_('deals', request.resource.data.lastDealId)).data.qtyTotal;
+      allow delete: if isAdmin();
+    }
+    function claimOk(d, id) {
+      let deal = get(doc_('deals', d.dealId)).data;
+      return d.customerUid == request.auth.uid && d.id == id && d.status == 'claimed'
+        && d.qty is int && d.qty >= 1 && d.qty <= 3 && dealsCfg().get('killAll', false) == false
+        && deal.status == 'live' && nowMs() < deal.expiresAtMs
+        && d.price == deal.dealPrice && d.storeId == deal.storeId && d.expiresAtMs == deal.expiresAtMs
+        && (d.fulfil == 'pickup' || (d.fulfil == 'delivery' && deal.fulfil == 'both'))
+        && d.deliveryFee == (d.fulfil == 'delivery' ? 39 : 0) && d.total == d.qty * d.price + d.deliveryFee
+        && payOk(d) && !d.keys().hasAny(['rider', 'run', 'pickupCode', 'rating', 'complaint'])
+        && getAfter(doc_('deals', d.dealId)).data.lastClaimId == id
+        && existsAfter(doc_('claimSecrets', id));
+    }
+    match /dealClaims/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid)
+        || isVendorOf(resource.data.get('storeId', '')) || isRiderId(resource.data.get('rider', ''));
+      allow create: if signedIn() && claimOk(request.resource.data, id);
+      allow update: if isAdmin()
+        // vendor hands over a pickup only with the customer's code; marks no-show only after the deal expired
+        || (isVendorOf(resource.data.storeId) && resource.data.status == 'claimed' && (
+              (resource.data.fulfil == 'pickup' && request.resource.data.status == 'picked_up'
+                && onlyChanges(['status', 'pickupCode', 'collectedVia', 'updatedAt'])
+                && request.resource.data.pickupCode == get(doc_('claimSecrets', id)).data.code)
+           || (request.resource.data.status == 'no_show' && nowMs() > resource.data.expiresAtMs && onlyChanges(['status', 'updatedAt']))))
+        // batched delivery run: the assigned rider delivers with the customer's code
+        || (isRiderId(resource.data.get('rider', '')) && resource.data.fulfil == 'delivery' && resource.data.status == 'claimed'
+            && request.resource.data.status == 'delivered' && onlyChanges(['status', 'pickupCode', 'collectedVia', 'updatedAt'])
+            && request.resource.data.pickupCode == get(doc_('claimSecrets', id)).data.code)
+        // customer rates once after pickup / delivery, optionally with a complaint
+        || (signedIn() && resource.data.customerUid == request.auth.uid && resource.data.status in ['picked_up', 'delivered']
+            && !resource.data.keys().hasAny(['rating']) && onlyChanges(['rating', 'complaint', 'ratedAt', 'updatedAt'])
+            && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+            && (!request.resource.data.keys().hasAny(['complaint']) || (request.resource.data.complaint is string && request.resource.data.complaint.size() <= 500)));
+      allow delete: if isAdmin();
+    }
+    match /claimSecrets/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid && request.resource.data.code.matches('^[0-9]{4}$')
+        && getAfter(doc_('dealClaims', id)).data.customerUid == request.auth.uid && !exists(doc_('dealClaims', id));
+      allow update, delete: if isAdmin();
+    }
+    // Deal-alert preferences (opt-in). The Cloud Function (admin SDK) reads these and writes lastPushDay.
+    match /dealPrefs/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow write: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['optIn', 'radiusKm', 'vegOnly', 'lat', 'lng', 'area', 'updatedAt', 'lastDealPushAt', 'lastPushDay'])
+        && request.resource.data.optIn is bool && request.resource.data.radiusKm is number && request.resource.data.radiusKm <= 5
+        && request.resource.data.get('lastPushDay', 0) == (resource == null ? 0 : resource.data.get('lastPushDay', 0));
+    }
+    match /pushLog/{id} { allow read: if isAdmin(); allow write: if false; }
   }
 }

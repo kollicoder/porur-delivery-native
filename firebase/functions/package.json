@@ -1,0 +1,8 @@
+{
+  "name": "porur-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": { "node": "22" },
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "firebase-admin": "^13.4.0", "firebase-functions": "^6.4.0" }
+}
