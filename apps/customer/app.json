@@ -30,7 +30,8 @@
       },
       "permissions": [
         "RECORD_AUDIO"
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -61,6 +62,20 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "99bb3ec0-0382-4864-97cb-2d05d52d6f6d"
+      }
+    },
+    "owner": "cv4591",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/99bb3ec0-0382-4864-97cb-2d05d52d6f6d",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

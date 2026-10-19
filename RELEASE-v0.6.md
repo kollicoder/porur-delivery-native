@@ -73,5 +73,14 @@ Demo hints and admin approval need the bootstrap admin (not published). The test
 ## Install (Android)
 Download `porur-customer.apk` and `porur-vendor.apk` (arm64) below. Voice input needs the Google app on the phone.
 
-## iPhone
-There is no iPhone build yet. The apps can run inside **Expo Go** once an Expo account is signed in, because Expo Go for SDK 57 on iOS requires a login. A real App Store or TestFlight build needs an Apple Developer Program membership (US$99 a year) and EAS Build.
+## iPhone (Expo Go)
+Both apps are published with EAS Update to the `preview` channel under the Expo account **cv4591**, so they open in Expo Go (SDK 57, App Store) at any time; the box does not need to be running.
+1. Install Expo Go from the App Store and sign in as cv4591 (avatar, top right).
+2. Open the project from the Projects list under the account, or scan a link with the Camera:
+   - Customer: `exp://u.expo.dev/99bb3ec0-0382-4864-97cb-2d05d52d6f6d?channel-name=preview`
+   - Partner: `exp://u.expo.dev/144b9794-b5a6-4f5b-bc87-28bb26827b3d?channel-name=preview`
+
+Voice input is not available in Expo Go, so it falls back to typing. A real App Store or TestFlight build needs an Apple Developer Program membership (US$99 a year) and EAS Build.
+
+## Push notifications
+The apps now register Expo push tokens using the EAS project IDs, and the Android builds include `google-services.json` for the Firebase Android apps on study-vignes. Android push delivery also needs the FCM V1 service-account key uploaded to each Expo project (expo.dev, then Credentials).

@@ -15,7 +15,10 @@
     "ios": {
       "bundleIdentifier": "com.porurdelivery.vendor",
       "supportsTablet": true,
-      "infoPlist": {}
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Understand your spoken deal",
+        "NSMicrophoneUsageDescription": "Speak your surplus deal"
+      }
     },
     "android": {
       "package": "com.porurdelivery.vendor",
@@ -25,7 +28,8 @@
       },
       "permissions": [
         "RECORD_AUDIO"
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -49,6 +53,20 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "144b9794-b5a6-4f5b-bc87-28bb26827b3d"
+      }
+    },
+    "owner": "cv4591",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/144b9794-b5a6-4f5b-bc87-28bb26827b3d",
+      "fallbackToCacheTimeout": 0
     }
   }
 }

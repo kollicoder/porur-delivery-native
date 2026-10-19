@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "350770556092",
+    "project_id": "study-vignes",
+    "storage_bucket": "study-vignes.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:350770556092:android:9d29417a34df3ba219f4b9",
+        "android_client_info": {
+          "package_name": "com.porurdelivery.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWcMF5KacZzTCFnRBWqwj97AlmB5BUgNI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:350770556092:android:b803ac230ae4203519f4b9",
+        "android_client_info": {
+          "package_name": "com.porurdelivery.vendor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCWcMF5KacZzTCFnRBWqwj97AlmB5BUgNI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

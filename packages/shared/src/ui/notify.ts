@@ -2,7 +2,9 @@
  *  plus Expo push tokens when an EAS project id is configured (EXPO_PUBLIC_EAS_PROJECT_ID). */
 import { Platform } from 'react-native';
 let N: any = null; try { N = require('expo-notifications'); } catch {}
-const EAS_ID = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+let C: any = null; try { C = require('expo-constants').default; } catch {}
+/** EAS project id: env override, else app.json extra.eas.projectId (set by `eas init`). */
+const EAS_ID: string | undefined = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || C?.expoConfig?.extra?.eas?.projectId || C?.easConfig?.projectId;
 export async function setupNotifications(): Promise<{ granted: boolean; pushToken?: string }> {
   if (Platform.OS === 'web') {
     if (typeof Notification === 'undefined') return { granted: false };
