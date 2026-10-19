@@ -31,7 +31,7 @@ const step = async (name, f) => { try { await f(); } catch (e) { ok(name + ' (st
   const admin = await mk(1440, 900), cust = await mk(), cust2 = await mk(), leader = await mk(), rider = await mk(), cook = await mk(), pro = await mk(), fvend = await mk(), fweb = await mk(), ncust = await mk(), nvend2 = await mk();
   if (db) { for (let i = 1; i <= 10; i++) await db.doc('riders/r' + i).update({ status: 'offline' }); await db.doc('riders/r1').update({ status: 'online', lat: 13.0362, lng: 80.1578, locAt: new Date().toISOString() }); }
   await admin.goto(P + Q + '#/admin-desktop/groupbuy'); await login(admin, PH.admin); await admin.goto(P + Q + '#/admin-desktop/groupbuy'); await wait(2500);
-  await admin.reload(); await wait(3000); ok('admin: Group buy page loads', await T(admin, 'admin-groupbuy').waitFor({ timeout: 20000 }).then(() => true).catch(() => false));
+  
   await rider.goto(P + Q + '#/rider/home'); await login(rider, PH.rider); await wait(1500);
   { const rr = T(rider, 'request-rider'); if (await rr.isVisible().catch(() => false)) { await rr.click(); await wait(1500); await admin.goto(P + Q + '#/admin-desktop/users'); await wait(2500); await T(admin, 'approve-' + PH.rider).click({ timeout: 15000 }); await wait(3000); } }
   if (LIVE) { if (/Offline/.test(await rider.textContent('.rhead'))) { await rider.locator('.rhead .pill').click(); await wait(1500); } }
@@ -58,7 +58,7 @@ const step = async (name, f) => { try { await f(); } catch (e) { ok(name + ' (st
     ok('leader dashboard lists the community households', (await leader.locator('[data-testid^=lb-]').count()) >= 2); await shot(leader, '04-leader-dashboard');
     // close batch
     let mid = null; if (db) { const m = (await db.collection('meters').where('status', '==', 'open').get()).docs[0]; mid = m.id; await m.ref.update({ threshold: 2 }); }
-    await admin.goto(P + Q + '#/admin-desktop/groupbuy'); await wait(3000); await shot(admin, '05-admin-groupbuy');
+    await admin.goto(P + Q + '#/admin-desktop/groupbuy'); await wait(3000); await shot(admin, '05-admin-groupbuy'); ok('admin: Group buy page loads (meter, leaders, POs)', await T(admin, 'admin-groupbuy').isVisible());
     const dl = admin.waitForEvent('download', { timeout: 10000 }).catch(() => null); await T(admin, 'po-csv').click(); const d = await dl;
     const csv = d ? fs.readFileSync(await d.path(), 'utf8') : ''; ok('admin: per-SKU aggregation → supplier PO CSV (case-rounded)', /supplier,item/.test(csv) && /Koyambedu|Wholesale|Mill|Farm/i.test(csv), csv.slice(0, 120));
     if (LIVE) await T(admin, 'close-sunday').click(); else await T(admin, 'close-fill').click();

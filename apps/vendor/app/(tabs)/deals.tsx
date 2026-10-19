@@ -11,6 +11,8 @@ import { s } from '../../src/theme';
 export default function Deals() {
   const { store, storeDoc } = useVendor(); const products = useProducts(); const now = useNow(15000);
   const [cfg, setCfg] = useState<any>(null); const [cap, setCap] = useState({ deals: 0, units: 0 }); const [deals, setDeals] = useState<Deal[] | null>(null); const [claims, setClaims] = useState<DealClaim[]>([]);
+  // hand-over errors live here: a rejected write briefly removes the card (latency compensation) and remounts it
+  const [hErr, setHErr] = useState<Record<string, string>>({});
   const [text, setText] = useState(''); const [lang, setLang] = useState<'ta-IN' | 'en-IN'>('ta-IN'); const [listening, setListening] = useState(false); const stop = useRef<null | (() => void)>(null);
   const [draft, setDraft] = useState<DealDraft | null>(null); const [msg, setMsg] = useState('');
   useEffect(() => { if (!store) return; const m = api.models; const subs = [m.watchDealsCfg(setCfg), m.watchCap(store.id, setCap), m.watchStoreDeals(store.id, setDeals), m.watchStoreClaims(store.id, setClaims)]; return () => subs.forEach(f => f()); }, [store?.id]);
@@ -42,7 +44,7 @@ export default function Deals() {
       <Kv k={`${d.emoji || ''} ${d.item} · ${rs(d.dealPrice)} (${d.discountPct}% off)`} v={`${d.qtyLeft}/${d.qtyTotal} left`} /><Text style={{ fontFamily: F.body, color: K.muted }}>Ends in {fmtLeft(d.expiresAtMs - now)} · {d.fulfil === 'both' ? 'pickup + delivery' : 'pickup only'}</Text>
       <Button kind="ghost" title="Stop this deal" style={{ marginTop: 6 }} onPress={() => api.models.removeDeal(d.id)} /></Card>)}
     <Title en={`Pickups to hand over (${open.length})`} ta="வாடிக்கையாளர் வருகை" />
-    {open.length === 0 ? <Text style={{ fontFamily: F.body, color: K.muted }}>Nobody waiting.</Text> : open.map(c => <Handover key={c.id} c={c} now={now} />)}
+    {open.length === 0 ? <Text style={{ fontFamily: F.body, color: K.muted }}>Nobody waiting.</Text> : open.map(c => <Handover key={c.id} c={c} now={now} err={hErr[c.id] || ''} setErr={(m: string) => setHErr(x => ({ ...x, [c.id]: m }))} />)}
   </ScrollView>;
 }
 function Confirm({ draft, cat, cap, blocked, transcript, onDone, onBack }: { draft: DealDraft; cat: any[]; cap: { deals: number; units: number }; blocked: string; transcript: string; onDone: (m: string) => void; onBack: () => void }) {
@@ -73,13 +75,13 @@ function Confirm({ draft, cat, cap, blocked, transcript, onDone, onBack }: { dra
     <Button kind="ghost" title="← Back" style={{ marginTop: 6 }} onPress={onBack} />
   </Card>;
 }
-function Handover({ c, now }: { c: DealClaim; now: number }) {
-  const [code, setCode] = useState(''); const [via, setVia] = useState<'cash' | 'upi'>('upi'); const [err, setErr] = useState('');
+function Handover({ c, now, err, setErr }: { c: DealClaim; now: number; err: string; setErr: (m: string) => void }) {
+  const [code, setCode] = useState(''); const [via, setVia] = useState<'cash' | 'upi'>('upi');
   if (c.fulfil === 'delivery') return <Card style={{ marginBottom: 8 }}><Kv k={`🛵 ${c.item} × ${c.qty} · ${c.customer}`} v={c.rider ? 'rider ' + c.rider : 'awaiting rider'} /><Text style={{ fontFamily: F.body, color: K.muted }}>Pack it — the batched run picks up at {DEALS.runs.join(' / ')}.</Text></Card>;
   return <Card testID={'vc-' + c.id} style={{ marginBottom: 8 }}><Kv k={`${c.item} × ${c.qty} · ${c.customer}`} v={rs(c.total)} /><Text style={{ fontFamily: F.body, color: K.muted }}>Collect before {fmtTime(c.expiresAtMs)}</Text>
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}><View style={{ flex: 1 }}><Field label="Pickup code" value={code} onChangeText={setCode} testID="vc-code" keyboardType="number-pad" maxLength={4} /></View></View>
     <View style={{ marginTop: 6 }}><Segmented value={via} onChange={setVia} options={[['upi', '📱 UPI'], ['cash', '💵 Cash']] as const} /></View>
     {!!err && <Text style={{ color: K.red, fontFamily: F.bold }}>{err}</Text>}
-    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}><Button testID="vc-handover" kind="green" title="Handed over" style={{ flex: 2 }} disabled={code.length !== 4} onPress={() => api.models.claimHandover(c.id, code, 'picked_up', via).catch(() => setErr('Wrong code — ask the customer to show the code in their app.'))} />
+    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}><Button testID="vc-handover" kind="green" title="Handed over" style={{ flex: 2 }} disabled={code.length !== 4} onPress={() => { setErr(''); api.models.claimHandover(c.id, code, 'picked_up', via).catch(() => setErr('Wrong code — ask the customer to show the code in their app.')); }} />
       {now > c.expiresAtMs && <Button kind="ghost" title="No-show" style={{ flex: 1 }} onPress={() => api.models.claimNoShow(c.id).catch(e => setErr(e.message))} />}</View></Card>;
 }
