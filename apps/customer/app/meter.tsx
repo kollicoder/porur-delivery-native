@@ -20,7 +20,7 @@ export default function MeterScreen() {
   useEffect(() => { if (meter?.listId) return api.models.watchList(meter.listId, setList); }, [meter?.listId]);
   useEffect(() => { const u = api.uid(); if (u) return api.models.watchDropsFor('uids', u, setDrops); }, []);
   const community = comms?.find(c => c.id === cid); const tot = useMemo(() => basketTotals(Object.entries(sel).map(([skuId, qty]) => ({ skuId, qty })), list?.skus || []), [sel, list]);
-  const current = mine.find(o => o.meterId === meter?.id && o.status !== 'cancelled'); const fc = meter ? meterForecast(meter, now) : null; const bal = walletBalance(wallet);
+  const due = mine.find(o => o.meterId !== meter?.id && o.finalTier && o.status !== 'cancelled' && o.handoverStatus !== 'handed'); /* last week's locked basket still to be delivered */ const current = mine.find(o => o.meterId === meter?.id && o.status !== 'cancelled'); const fc = meter ? meterForecast(meter, now) : null; const bal = walletBalance(wallet);
   const open = meter?.status === 'open' && now < (meter?.cutoffMs || 0);
   if (!comms || !meters) return <ScrollView contentContainerStyle={{ padding: 16 }}><SkeletonList n={5} testID="meter-loading" /></ScrollView>;
   if (!meter) return <Empty testID="meter-empty" emoji="🧺" title="No group buy open right now" body="A new weekly meter opens every Sunday. Check back soon." action="Back home" onAction={() => router.back()} />;
@@ -46,6 +46,7 @@ export default function MeterScreen() {
     <Card testID="meter-tiers"><Kv k="🟡 Meter fills (100 baskets)" v="Fill price · 7–9 am next day" /><Kv k="⚪ Doesn't fill by Sat 9 pm" v="Sunday price · Sun 9–11 am" />
       <Text style={{ fontFamily: F.body, fontSize: 13, color: K.muted, marginTop: 6 }}>You commit at the Sunday price — that's the most you'll ever pay. Pay cash or UPI to your community leader when it arrives. If it fills, you simply pay the lower price. Line refunds (short or bad items) go to your Porur wallet and come off your next basket.</Text></Card>
     {bal > 0 && <Banner tone="ok" icon="👛" title={`Wallet: ${rs(bal)} credit`} body="Applied automatically to your next group-buy basket." testID="meter-wallet" />}
+    {due && <MyBasket o={due} drops={drops} open={false} />}
     {current ? <MyBasket o={current} drops={drops} open={open} /> : !open ? <Banner tone="warn" title="This week's meter is closed" body="The next meter opens shortly — you can commit then." testID="meter-closed" /> : <>
       <Title en="1. Your community" ta="உங்கள் குடியிருப்பு" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{comms.map(c => <Chip key={c.id} testID={'comm-' + c.id} label={c.name} on={c.id === cid} onPress={() => setCid(c.id)} />)}</View>
@@ -70,7 +71,7 @@ export default function MeterScreen() {
     </>}
     {!!ok && <Banner tone="ok" icon="✅" title={ok} testID="meter-ok" />}
     <Title en="Past baskets" ta="முந்தைய கூடைகள்" />
-    {mine.filter(o => o.id !== current?.id).length === 0 ? <Text style={{ fontFamily: F.body, color: K.muted }}>Nothing yet.</Text> : mine.filter(o => o.id !== current?.id).map(o =>
+    {mine.filter(o => o.id !== current?.id && o.id !== due?.id).length === 0 ? <Text style={{ fontFamily: F.body, color: K.muted }}>Nothing yet.</Text> : mine.filter(o => o.id !== current?.id && o.id !== due?.id).map(o =>
       <Card key={o.id} style={{ marginBottom: 8 }} testID={'basket-' + o.id}><Kv k={`${o.id} · ${o.lines.length} items`} v={o.status} /><Kv k={o.finalTier ? `Final (${o.finalTier} price)` : 'Sunday price'} v={rs(o.amountDue ?? o.finalAmount ?? o.sundayTotal)} /></Card>)}
     {me?.role === 'leader' && <Button testID="open-leader" kind="dark" title="👑  Open leader dashboard" style={{ marginTop: 14 }} onPress={() => router.push('/leader')} />}
     {wallet.length > 0 && <><Title en="Wallet" ta="வாலட்" />{wallet.map(w => <Kv key={w.id} k={`${w.reason} · ${w.createdAt.slice(0, 10)}`} v={(w.amount > 0 ? '+' : '') + rs(w.amount)} />)}</>}

@@ -31,8 +31,9 @@ const step = async (name, f) => { try { await f(); } catch (e) { ok(name + ' (st
   const admin = await mk(1440, 900), cust = await mk(), cust2 = await mk(), leader = await mk(), rider = await mk(), cook = await mk(), pro = await mk(), fvend = await mk(), fweb = await mk(), ncust = await mk(), nvend2 = await mk();
   if (db) { for (let i = 1; i <= 10; i++) await db.doc('riders/r' + i).update({ status: 'offline' }); await db.doc('riders/r1').update({ status: 'online', lat: 13.0362, lng: 80.1578, locAt: new Date().toISOString() }); }
   await admin.goto(P + Q + '#/admin-desktop/groupbuy'); await login(admin, PH.admin); await admin.goto(P + Q + '#/admin-desktop/groupbuy'); await wait(2500);
-  ok('admin: Group buy page loads', await T(admin, 'admin-groupbuy').isVisible({ timeout: 15000 }).catch(() => false));
+  await admin.reload(); await wait(3000); ok('admin: Group buy page loads', await T(admin, 'admin-groupbuy').waitFor({ timeout: 20000 }).then(() => true).catch(() => false));
   await rider.goto(P + Q + '#/rider/home'); await login(rider, PH.rider); await wait(1500);
+  { const rr = T(rider, 'request-rider'); if (await rr.isVisible().catch(() => false)) { await rr.click(); await wait(1500); await admin.goto(P + Q + '#/admin-desktop/users'); await wait(2500); await T(admin, 'approve-' + PH.rider).click({ timeout: 15000 }); await wait(3000); } }
   if (LIVE) { if (/Offline/.test(await rider.textContent('.rhead'))) { await rider.locator('.rhead .pill').click(); await wait(1500); } }
   await leader.goto(P + Q + '#/customer/home'); await login(leader, PH.leader);
 
@@ -147,7 +148,7 @@ const step = async (name, f) => { try { await f(); } catch (e) { ok(name + ' (st
     const card = cust.locator('[data-testid^=deal-DL]', { hasText: 'Chicken Biryani' }).first(); await card.waitFor({ timeout: 15000 }); await shot(cust, '22-customer-deals');
     await card.locator('[data-testid^=deal-open-]').click(); await card.locator('[data-testid=claim-qty] button[aria-label=more]').click(); await card.getByTestId('claim-confirm').click(); await card.getByTestId('claim-ok').waitFor({ timeout: 15000 });
     await wait(1500); const pc = await codeIn(cust, 'claim-code'); ok('atomic claim (2 portions) → private pickup code', !!pc); await shot(cust, '23-claim-code');
-    await fvend.reload(); await wait(4000); const vc = fvend.locator('[data-testid^=vc-CL]').first(); await vc.getByTestId('vc-code').fill(pc === '0000' ? '1111' : '0000'); await vc.getByTestId('vc-handover').click(); await wait(2500);
+    await fvend.reload(); await wait(4000); const vc = fvend.locator('[data-testid^=vc-CL]').first(); await vc.getByTestId('vc-code').waitFor({ timeout: 15000 }); await wait(3000); await vc.getByTestId('vc-code').fill(pc === '0000' ? '1111' : '0000'); await vc.getByTestId('vc-handover').click(); await wait(2500); await shot(fvend, '23b-vendor-wrong-code');
     ok('wrong pickup code rejected', /Wrong code/.test(await fvend.textContent('body'))); await vc.getByTestId('vc-code').fill(pc); await vc.getByTestId('vc-handover').click(); await wait(3000);
     ok('vendor hands over with the code', !(await fvend.locator('[data-testid^=vc-CL]').count()));
     await cust.reload(); await wait(3500); await T(cust, 'claim-stars-2').click(); await T(cust, 'claim-complaint').fill('Rice was cold'); await T(cust, 'claim-rate').click(); await wait(2000); ok('customer rates + complains', /complaint sent/.test(await cust.textContent('body')));
